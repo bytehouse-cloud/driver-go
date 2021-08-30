@@ -1,0 +1,31 @@
+{
+	"meta":
+	[
+		{
+			"name": "dog",
+			"type": "Map(String,UInt32)"
+		},
+		{
+			"name": "cat",
+			"type": "UInt32"
+		}
+	],
+
+	"data":
+	[
+		{			
+			"dog": "{'1': 1}",			
+			"cat": 2
+		},
+		{			
+			"dog": "{'1': 1}",			
+			"cat": 4
+		},
+		{			
+			"dog": "{'1': 1}",			
+			"cat": 6
+		}
+	],
+
+	"rows": 3
+}
