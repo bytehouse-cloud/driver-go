@@ -2,6 +2,7 @@ package column
 
 import (
 	"reflect"
+	"time"
 
 	"github.com/bytehouse-cloud/driver-go/driver/lib/ch_encoding"
 )
@@ -15,6 +16,10 @@ type CHColumn struct {
 }
 
 func ReadColumnFromDecoder(decoder *ch_encoding.Decoder, numRows int) (*CHColumn, error) {
+	return ReadColumnFromDecoderWithLocation(decoder, numRows, nil)
+}
+
+func ReadColumnFromDecoderWithLocation(decoder *ch_encoding.Decoder, numRows int, location *time.Location) (*CHColumn, error) {
 	var (
 		c   CHColumn
 		err error
@@ -28,7 +33,7 @@ func ReadColumnFromDecoder(decoder *ch_encoding.Decoder, numRows int) (*CHColumn
 		return nil, err
 	}
 	c.Type = CHColumnType(s)
-	c.GenerateColumn, err = GenerateColumnDataFactory(c.Type)
+	c.GenerateColumn, err = GenerateColumnDataFactoryWithLocation(c.Type, location)
 	if err != nil {
 		return nil, err
 	}

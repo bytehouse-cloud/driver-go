@@ -2,6 +2,7 @@ package data
 
 import (
 	"strings"
+	"time"
 	"unicode/utf8"
 
 	"github.com/bytehouse-cloud/driver-go/driver/lib/ch_encoding"
@@ -16,7 +17,7 @@ type Block struct {
 	Columns    []*column.CHColumn
 }
 
-func NewBlock(colNames []string, colTypes []column.CHColumnType, numRows int) (*Block, error) {
+func NewBlockWithLocation(colNames []string, colTypes []column.CHColumnType, numRows int, location *time.Location) (*Block, error) {
 	numCols := len(colNames)
 	if numCols != len(colTypes) {
 		return nil, errors.ErrorfWithCaller("len don't match: %s, %s", colNames, colTypes)
@@ -24,7 +25,7 @@ func NewBlock(colNames []string, colTypes []column.CHColumnType, numRows int) (*
 
 	cols := make([]*column.CHColumn, len(colTypes))
 	for i, colType := range colTypes {
-		gen, err := column.GenerateColumnDataFactory(colType)
+		gen, err := column.GenerateColumnDataFactoryWithLocation(colType, location)
 		if err != nil {
 			return nil, err
 		}
@@ -44,7 +45,15 @@ func NewBlock(colNames []string, colTypes []column.CHColumnType, numRows int) (*
 	}, nil
 }
 
+func NewBlock(colNames []string, colTypes []column.CHColumnType, numRows int) (*Block, error) {
+	return NewBlockWithLocation(colNames, colTypes, numRows, nil)
+}
+
 func ReadBlockFromDecoder(decoder *ch_encoding.Decoder) (*Block, error) {
+	return ReadBlockFromDecoderWithLocation(decoder, nil)
+}
+
+func ReadBlockFromDecoderWithLocation(decoder *ch_encoding.Decoder, location *time.Location) (*Block, error) {
 	var (
 		block Block
 		i     uint64
@@ -66,7 +75,7 @@ func ReadBlockFromDecoder(decoder *ch_encoding.Decoder) (*Block, error) {
 	block.NumRows = int(i)
 	block.Columns = make([]*column.CHColumn, block.NumColumns)
 	for j := range block.Columns {
-		if block.Columns[j], err = column.ReadColumnFromDecoder(decoder, block.NumRows); err != nil {
+		if block.Columns[j], err = column.ReadColumnFromDecoderWithLocation(decoder, block.NumRows, location); err != nil {
 			return nil, err
 		}
 	}

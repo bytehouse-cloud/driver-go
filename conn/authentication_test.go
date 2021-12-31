@@ -2,8 +2,6 @@ package conn
 
 import (
 	"bytes"
-	"fmt"
-	"os"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -11,49 +9,33 @@ import (
 	"github.com/bytehouse-cloud/driver-go/driver/lib/ch_encoding"
 )
 
-func TestAuthentication_WriteToEncoder(t *testing.T) {
-	var buffer bytes.Buffer
-
+func TestAuthentication(t *testing.T) {
 	tests := []struct {
-		name    string
-		encoder *ch_encoding.Encoder
-		auth    *Authentication
-		wantErr bool
+		name            string
+		auth            Authentication
+		wantWrittenData []byte
 	}{
 		{
-			name:    "Can write to encoder with token",
-			encoder: ch_encoding.NewEncoder(&buffer),
-			auth:    NewAuthentication("123", "123", "123"),
-			wantErr: false,
+			name:            "If Password Authentication then Write OK",
+			auth:            NewPasswordAuthentication("u1", "ps1"),
+			wantWrittenData: []byte{0, 2, 117, 49, 3, 112, 115, 49},
 		},
 		{
-			name:    "Can write to encoder without token",
-			encoder: ch_encoding.NewEncoder(&buffer),
-			auth:    NewAuthentication("", "123", "123"),
-			wantErr: false,
-		},
-		{
-			name: "Can throw error if encoder has a problem",
-			encoder: func() *ch_encoding.Encoder {
-				file, _ := os.Create("")
-				return ch_encoding.NewEncoder(file)
-			}(),
-			auth: &Authentication{
-				token: "",
-			},
-			wantErr: true,
+			name:            "If System Authentication then Write OK",
+			auth:            NewSystemAuthentication("some_system_token"),
+			wantWrittenData: []byte{232, 7, 17, 115, 111, 109, 101, 95, 115, 121, 115, 116, 101, 109, 95, 116, 111, 107, 101, 110},
 		},
 	}
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := tt.auth.WriteToEncoder(tt.encoder)
-			if tt.wantErr {
-				fmt.Println(err)
-				require.Error(t, err)
-				return
-			}
-
+			var buf bytes.Buffer
+			enc := ch_encoding.NewEncoder(&buf)
+			err := tt.auth.WriteAuthProtocol(enc)
 			require.NoError(t, err)
+			err = tt.auth.WriteAuthData(enc)
+			require.NoError(t, err)
+			require.Equal(t, tt.wantWrittenData, buf.Bytes())
 		})
 	}
 }

@@ -90,7 +90,7 @@ func (dec *Decoder) String() (string, error) {
 		return emptyString, err
 	}
 
-	return sixb.BtS(b), nil
+	return sixb.BtoS(b), nil
 }
 
 func (dec *Decoder) UInt32() (uint32, error) {

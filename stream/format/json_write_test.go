@@ -37,13 +37,13 @@ func TestJSONBlockStreamFmtWriter_BlockStreamFmtWrite(t *testing.T) {
 		NumRows:    0,
 		Columns: []*column.CHColumn{
 			{
-				Name:           "'a'",
+				Name:           "a",
 				Type:           "String",
 				Data:           column.MustGenerateColumnDataFactory(column.STRING)(0),
 				GenerateColumn: column.MustGenerateColumnDataFactory(column.STRING),
 			},
 			{
-				Name:           "'b'",
+				Name:           "b",
 				Type:           "String",
 				Data:           column.MustGenerateColumnDataFactory(column.STRING)(0),
 				GenerateColumn: column.MustGenerateColumnDataFactory(column.STRING),
@@ -173,9 +173,9 @@ func TestJSONBlockStreamFmtWriter_BlockStreamFmtWrite(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			blockStream := tt.blockStreamReader.BlockStreamFmtRead(tt.args.ctx, tt.args.sample, tt.args.blockSize)
+			blockStream, yield := tt.blockStreamReader.BlockStreamFmtRead(tt.args.ctx, tt.args.sample, tt.args.blockSize)
 			tt.blockStreamWriter.BlockStreamFmtWrite(blockStream)
-			rows, err := tt.blockStreamWriter.Yield()
+			rows, err := yield()
 			require.NoError(t, err)
 			require.Equal(t, rows, tt.wantRowsRead)
 		})

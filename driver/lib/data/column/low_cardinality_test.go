@@ -213,7 +213,6 @@ func TestLowCardinalityColumnData_ReadFromTexts(t *testing.T) {
 
 			got, err := i.ReadFromTexts(tt.args.texts)
 
-			fmt.Println(err)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("ReadFromTexts() error = %v, wantErr = %v", err, tt.wantErr)
 				return

@@ -31,13 +31,13 @@ func TestDateTime64ColumnData_ReadFromTexts(t *testing.T) {
 			wantErr:      false,
 		},
 		{
-			name: "Should write data and return number of rows read with no error",
+			name: "Given inconsistent format then throw error",
 			args: args{
 				texts: []string{"1950-01-02", "2020-01-02 15:04:05", "2020-01-02 15:04:05.322"},
 			},
 			wantDataWritten: []string{"1950-01-02 00:00:00", "2020-01-02 15:04:05", "2020-01-02 15:04:05.322"},
 			wantRowsRead:    3,
-			wantErr:         false,
+			wantErr:         true,
 		},
 		{
 			name: "Should write data and return number of rows read with no error, empty string",
@@ -62,10 +62,11 @@ func TestDateTime64ColumnData_ReadFromTexts(t *testing.T) {
 			i := MustMakeColumnData("DateTime64(6)", 1000)
 
 			got, err := i.ReadFromTexts(tt.args.texts)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("ReadFromTexts() error = %v, wantErr %v", err, tt.wantErr)
+			if tt.wantErr {
+				require.Error(t, err)
 				return
 			}
+			require.NoError(t, err)
 			if got != tt.wantRowsRead {
 				t.Errorf("ReadFromTexts() got = %v, wantRowsRead %v", got, tt.wantRowsRead)
 			}
@@ -155,13 +156,13 @@ func TestDateTime64ColumnData_EncoderDecoder(t *testing.T) {
 			wantErr:      false,
 		},
 		{
-			name: "Should write data and return number of rows read with no error",
+			name: "Given inconsistent format then throw error",
 			args: args{
 				texts: []string{"1950-01-02", "2020-01-02 15:04:05", "2020-01-02 15:04:05.322"},
 			},
 			wantDataWritten: []string{"1950-01-02 00:00:00", "2020-01-02 15:04:05", "2020-01-02 15:04:05.322"},
 			wantRowsRead:    3,
-			wantErr:         false,
+			wantErr:         true,
 		},
 		{
 			name: "Should write data and return number of rows read with no error, empty string",
@@ -182,6 +183,10 @@ func TestDateTime64ColumnData_EncoderDecoder(t *testing.T) {
 			// Write to encoder
 			original := MustMakeColumnData("DateTime64(6)", len(tt.args.texts))
 			got, err := original.ReadFromTexts(tt.args.texts)
+			if tt.wantErr {
+				require.Error(t, err)
+				return
+			}
 			require.NoError(t, err)
 			require.Equal(t, got, tt.wantRowsRead)
 			require.NoError(t, err)

@@ -3,6 +3,7 @@ package column
 import (
 	"bytes"
 	"fmt"
+	"math/big"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -43,12 +44,12 @@ func TestDecimalColumnData_ReadFromTexts(t *testing.T) {
 			wantErr:         false,
 		},
 		{
-			name:        "Should throw error if precision not supported",
-			decimalType: "Decimal(38,5)",
+			name:        "Should throw error if precision/scale not supported",
+			decimalType: "Decimal(58,5)",
 			decimalWant: struct {
 				precision int
 				scale     int
-			}{precision: 38, scale: 5},
+			}{precision: 58, scale: 5},
 			args: args{
 				texts: []string{"122.00000", "1220.00000"},
 			},
@@ -137,6 +138,23 @@ func TestDecimalColumnData_ReadFromTexts(t *testing.T) {
 			wantRowsRead: 0,
 			wantErr:      true,
 		},
+		{
+			name:        "Should work for Big Float",
+			decimalType: "Decimal(38,15)",
+			decimalWant: struct {
+				precision int
+				scale     int
+			}{precision: 38, scale: 15},
+			args: args{
+				texts: []string{
+					"99999999999999999999111.122228888777733",
+					"9.012345678987654321",
+					"3.141592653589793238",
+				},
+			},
+			wantRowsRead: 3,
+			wantErr:      false,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -183,6 +201,7 @@ func TestDecimalColumnData_ReadFromValues(t *testing.T) {
 		args            args
 		decimalType     CHColumnType
 		wantDataWritten []interface{}
+		wantValueString []string
 		wantRowsRead    int
 		wantErr         bool
 	}{
@@ -193,6 +212,7 @@ func TestDecimalColumnData_ReadFromValues(t *testing.T) {
 				values: []interface{}{},
 			},
 			wantDataWritten: nil,
+			wantValueString: []string{},
 			wantRowsRead:    0,
 			wantErr:         false,
 		},
@@ -203,6 +223,7 @@ func TestDecimalColumnData_ReadFromValues(t *testing.T) {
 				values: []interface{}{float64(122), float64(123)},
 			},
 			wantDataWritten: nil,
+			wantValueString: []string{"122", "123"},
 			wantRowsRead:    2,
 			wantErr:         false,
 		},
@@ -212,8 +233,9 @@ func TestDecimalColumnData_ReadFromValues(t *testing.T) {
 			args: args{
 				values: []interface{}{float32(122), float32(123)},
 			},
-			wantRowsRead: 2,
-			wantErr:      false,
+			wantValueString: []string{"122", "123"},
+			wantRowsRead:    2,
+			wantErr:         false,
 		},
 		{
 			name:        "Should write data and return number of rows read with no error for int8",
@@ -221,8 +243,9 @@ func TestDecimalColumnData_ReadFromValues(t *testing.T) {
 			args: args{
 				values: []interface{}{int8(122), int8(123)},
 			},
-			wantRowsRead: 2,
-			wantErr:      false,
+			wantValueString: []string{"122", "123"},
+			wantRowsRead:    2,
+			wantErr:         false,
 		},
 		{
 			name:        "Should write data and return number of rows read with no error for int16",
@@ -230,8 +253,9 @@ func TestDecimalColumnData_ReadFromValues(t *testing.T) {
 			args: args{
 				values: []interface{}{int16(122), int16(123)},
 			},
-			wantRowsRead: 2,
-			wantErr:      false,
+			wantValueString: []string{"122", "123"},
+			wantRowsRead:    2,
+			wantErr:         false,
 		},
 		{
 			name:        "Should write data and return number of rows read with no error for int32",
@@ -239,8 +263,9 @@ func TestDecimalColumnData_ReadFromValues(t *testing.T) {
 			args: args{
 				values: []interface{}{int32(122), int32(123)},
 			},
-			wantRowsRead: 2,
-			wantErr:      false,
+			wantValueString: []string{"122", "123"},
+			wantRowsRead:    2,
+			wantErr:         false,
 		},
 		{
 			name:        "Should write data and return number of rows read with no error for int",
@@ -248,8 +273,9 @@ func TestDecimalColumnData_ReadFromValues(t *testing.T) {
 			args: args{
 				values: []interface{}{int(122), int(123)},
 			},
-			wantRowsRead: 2,
-			wantErr:      false,
+			wantValueString: []string{"122", "123"},
+			wantRowsRead:    2,
+			wantErr:         false,
 		},
 		{
 			name:        "Should write data and return number of rows read with no error for int64",
@@ -270,22 +296,14 @@ func TestDecimalColumnData_ReadFromValues(t *testing.T) {
 			wantErr:      false,
 		},
 		{
-			name:        "Should throw error if inconsistent type",
-			decimalType: "Decimal(18,5)",
-			args: args{
-				values: []interface{}{float32(122.23), float64(4.33333)},
-			},
-			wantRowsRead: 1,
-			wantErr:      true,
-		},
-		{
 			name:        "Should throw error if precision too big",
 			decimalType: "Decimal(111,5)",
 			args: args{
 				values: []interface{}{float32(122.23), float64(4.33333)},
 			},
-			wantRowsRead: 0,
-			wantErr:      true,
+			wantValueString: []string{"122.23", "4.33333"},
+			wantRowsRead:    0,
+			wantErr:         true,
 		},
 		{
 			name:        "Should throw error if read value not a decimal",
@@ -296,12 +314,22 @@ func TestDecimalColumnData_ReadFromValues(t *testing.T) {
 			wantRowsRead: 0,
 			wantErr:      true,
 		},
+		{
+			name:        "Should write data from big float",
+			decimalType: "Decimal(38,11)",
+			args: args{
+				values: []interface{}{big.NewFloat(3.14159265359), big.NewFloat(3.14159265359)},
+			},
+			wantValueString: []string{"3.14159265359", "3.14159265359"},
+			wantRowsRead:    2,
+			wantErr:         false,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			i := MustMakeColumnData(tt.decimalType, 1000)
+			col := MustMakeColumnData(tt.decimalType, 1000)
 
-			got, err := i.ReadFromValues(tt.args.values)
+			got, err := col.ReadFromValues(tt.args.values)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("ReadFromValues() error = %v, wantErr %v", err, tt.wantErr)
 				return
@@ -310,9 +338,9 @@ func TestDecimalColumnData_ReadFromValues(t *testing.T) {
 				t.Errorf("ReadFromValues() got = %v, wantRowsRead %v", got, tt.wantRowsRead)
 			}
 
-			for index, value := range tt.args.values {
+			for idx, wantStr := range tt.wantValueString {
 				if !tt.wantErr {
-					assert.Equal(t, fmt.Sprint(value), fmt.Sprint(i.GetValue(index)))
+					assert.Equal(t, wantStr, fmt.Sprint(col.GetValue(idx)))
 				}
 			}
 		})
@@ -320,21 +348,17 @@ func TestDecimalColumnData_ReadFromValues(t *testing.T) {
 }
 
 func TestDecimalColumnData_EncoderDecoder(t *testing.T) {
-	type args struct {
-		texts []string
-	}
 	tests := []struct {
 		name        string
-		args        args
+		args        []string
 		decimalType CHColumnType
 		decimalWant struct {
 			precision int
 			scale     int
 		}
-		wantRawDataWritten []float64
-		wantDataWritten    []string
-		wantRowsRead       int
-		wantErr            bool
+		wantDataWritten []string
+		wantRowsRead    int
+		wantErr         bool
 	}{
 		{
 			name:        "Should write data and return number of rows read with no error, 2 rows",
@@ -343,9 +367,7 @@ func TestDecimalColumnData_EncoderDecoder(t *testing.T) {
 				precision int
 				scale     int
 			}{precision: 18, scale: 5},
-			args: args{
-				texts: []string{"122.00000", "1220.00000"},
-			},
+			args:            []string{"122.00000", "1220.00000"},
 			wantDataWritten: []string{"122.00000", "1220.00000"},
 			wantRowsRead:    2,
 			wantErr:         false,
@@ -357,11 +379,33 @@ func TestDecimalColumnData_EncoderDecoder(t *testing.T) {
 				precision int
 				scale     int
 			}{precision: 18, scale: 0},
-			args: args{
-				texts: []string{"122.123453232323", "122.123453232323898"},
-			},
+			args:            []string{"122.123453232323", "122.123453232323898"},
 			wantDataWritten: []string{"122", "122"},
 			wantRowsRead:    2,
+			wantErr:         false,
+		},
+		{
+			name:        "Should convert decimal(38,2) with 2 decimal digit",
+			decimalType: "Decimal(38,2)",
+			decimalWant: struct {
+				precision int
+				scale     int
+			}{precision: 38, scale: 2},
+			args:            []string{"9.99999999"},
+			wantDataWritten: []string{"9.99"},
+			wantRowsRead:    1,
+			wantErr:         false,
+		},
+		{
+			name:        "Should convert decimal(38,10) with 10 decimal digit",
+			decimalType: "Decimal(38,10)",
+			decimalWant: struct {
+				precision int
+				scale     int
+			}{precision: 38, scale: 10},
+			args:            []string{"3.141592653589793"},
+			wantDataWritten: []string{"3.1415926535"},
+			wantRowsRead:    1,
 			wantErr:         false,
 		},
 	}
@@ -372,16 +416,18 @@ func TestDecimalColumnData_EncoderDecoder(t *testing.T) {
 			decoder := ch_encoding.NewDecoder(&buffer)
 
 			// Write to encoder
-			original := MustMakeColumnData(tt.decimalType, len(tt.args.texts))
-			got, err := original.ReadFromTexts(tt.args.texts)
+			original := MustMakeColumnData(tt.decimalType, len(tt.args))
+			got, err := original.ReadFromTexts(tt.args)
+
 			require.NoError(t, err)
 			require.Equal(t, got, tt.wantRowsRead)
 			require.NoError(t, err)
+
 			err = original.WriteToEncoder(encoder)
 			require.NoError(t, err)
 
 			// Read from decoder
-			newCopy := MustMakeColumnData(tt.decimalType, len(tt.args.texts))
+			newCopy := MustMakeColumnData(tt.decimalType, len(tt.args))
 			err = newCopy.ReadFromDecoder(decoder)
 
 			for index, value := range tt.wantDataWritten {

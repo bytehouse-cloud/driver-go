@@ -2,6 +2,7 @@ package response
 
 import (
 	"strings"
+	"time"
 
 	"github.com/bytehouse-cloud/driver-go/driver/lib/ch_encoding"
 	"github.com/bytehouse-cloud/driver-go/driver/lib/data"
@@ -16,12 +17,12 @@ func (s *DataPacket) Close() error {
 	return s.Block.Close()
 }
 
-func readDataPacket(decoder *ch_encoding.Decoder, compress bool) (*DataPacket, error) {
+func readDataPacket(decoder *ch_encoding.Decoder, compress bool, location *time.Location) (*DataPacket, error) {
 	var (
 		serverData DataPacket
 		err        error
 	)
-	serverData.Table, serverData.Block, err = readBlock(decoder, compress)
+	serverData.Table, serverData.Block, err = readBlockWithLocation(decoder, compress, location)
 	if err != nil {
 		return nil, err
 	}

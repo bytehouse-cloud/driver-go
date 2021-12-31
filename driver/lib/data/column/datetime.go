@@ -51,7 +51,7 @@ func (d *DateTimeColumnData) ReadFromTexts(texts []string) (int, error) {
 		err error
 	)
 
-	parseTime := interpretTimeFormat([]string{dateFormat, dateTimeFormat}, texts, time.Local)
+	parseTime := interpretTimeFormat([]string{dateFormat, dateTimeFormat}, texts, d.timeZone)
 
 	for i, text := range texts {
 		if text == "" {
@@ -71,7 +71,12 @@ func (d *DateTimeColumnData) ReadFromTexts(texts []string) (int, error) {
 
 func (d *DateTimeColumnData) get(row int) time.Time {
 	secondsSinceEpoch := bufferRowToUint32(d.raw, row)
-	return time.Unix(int64(secondsSinceEpoch), 0).In(d.timeZone)
+	if d.timeZone != nil {
+		//TODO: remove this if branch, function should be decided at the
+		// time when column in initialized
+		return time.Unix(int64(secondsSinceEpoch), 0).In(d.timeZone)
+	}
+	return time.Unix(int64(secondsSinceEpoch), 0)
 }
 
 func (d *DateTimeColumnData) GetValue(row int) interface{} {
@@ -79,7 +84,7 @@ func (d *DateTimeColumnData) GetValue(row int) interface{} {
 }
 
 func (d *DateTimeColumnData) GetString(row int) string {
-	return d.get(row).In(d.timeZone).Format(dateTimeFormat)
+	return d.get(row).Format(dateTimeFormat)
 }
 
 func (d *DateTimeColumnData) Zero() interface{} {

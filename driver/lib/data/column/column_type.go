@@ -5,6 +5,7 @@ import (
 	"net"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/bytehouse-cloud/driver-go/driver/lib/bytepool"
 )
@@ -62,7 +63,7 @@ const (
 func MustMakeColumnData(t CHColumnType, numRows int) CHColumnData {
 	baseImpl, ok := basicDataTypeImpl[t]
 	if !ok {
-		gen, err := generateComplex(t)
+		gen, err := generateComplex(t, nil)
 		if err != nil {
 			panic(err)
 		}
@@ -76,9 +77,13 @@ func MustMakeColumnData(t CHColumnType, numRows int) CHColumnData {
 type GenerateColumnData func(numRows int) CHColumnData
 
 func GenerateColumnDataFactory(t CHColumnType) (GenerateColumnData, error) {
+	return GenerateColumnDataFactoryWithLocation(t, nil)
+}
+
+func GenerateColumnDataFactoryWithLocation(t CHColumnType, location *time.Location) (GenerateColumnData, error) {
 	baseImpl, ok := basicDataTypeImpl[t]
 	if !ok {
-		return generateComplex(t)
+		return generateComplex(t, location)
 	}
 	return baseImpl, nil
 }
@@ -91,7 +96,7 @@ func MustGenerateColumnDataFactory(t CHColumnType) GenerateColumnData {
 	return gen
 }
 
-func generateComplex(t CHColumnType) (GenerateColumnData, error) {
+func generateComplex(t CHColumnType, location *time.Location) (GenerateColumnData, error) {
 	switch {
 	case strings.HasPrefix(string(t), string(NULLABLE)):
 		return makeNullableColumnData(t)
@@ -110,9 +115,9 @@ func generateComplex(t CHColumnType) (GenerateColumnData, error) {
 	case strings.HasPrefix(string(t), string(DECIMAL)):
 		return makeDecimalColumnData(t)
 	case strings.HasPrefix(string(t), string(DATETIME64)):
-		return makeDateTime64ColumnData(t)
+		return makeDateTime64ColumnData(t, location)
 	case strings.HasPrefix(string(t), string(DATETIME)):
-		return makeDateTimeColumnData(t)
+		return makeDateTimeColumnData(t, location)
 	case strings.HasPrefix(string(t), string(LOWCARDINALITY)):
 		return makeLowCardinality(t)
 	default:
@@ -231,10 +236,13 @@ var basicDataTypeImpl = map[CHColumnType]func(numRows int) CHColumnData{
 	},
 }
 
-func makeDateTimeColumnData(t CHColumnType) (GenerateColumnData, error) {
-	location, err := getDateTimeLocation(t)
+func makeDateTimeColumnData(t CHColumnType, location *time.Location) (GenerateColumnData, error) {
+	loc, err := getDateTimeLocation(t)
 	if err != nil {
 		return nil, err
+	}
+	if loc != nil {
+		location = loc
 	}
 
 	return func(numRows int) CHColumnData {
@@ -245,16 +253,19 @@ func makeDateTimeColumnData(t CHColumnType) (GenerateColumnData, error) {
 	}, nil
 }
 
-func makeDateTime64ColumnData(t CHColumnType) (GenerateColumnData, error) {
-	precision, timeZone, err := getDateTime64Param(t)
+func makeDateTime64ColumnData(t CHColumnType, location *time.Location) (GenerateColumnData, error) {
+	precision, loc, err := getDateTime64Param(t)
 	if err != nil {
 		return nil, err
+	}
+	if loc != nil {
+		location = loc
 	}
 
 	return func(numRows int) CHColumnData {
 		return &DateTime64ColumnData{
 			precision: precision,
-			timeZone:  timeZone,
+			timeZone:  location,
 			raw:       bytepool.GetBytesWithLen(numRows * dateTime64Len),
 		}
 	}, nil

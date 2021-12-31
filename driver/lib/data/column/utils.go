@@ -213,7 +213,7 @@ func getRowRaw(raw []byte, row int, rowSize int) []byte {
 
 func getDateTimeLocation(t CHColumnType) (*time.Location, error) {
 	if len(t) < 9 { // DateTime
-		return time.Local, nil
+		return nil, nil
 	}
 	tzString := string(t[10 : len(t)-2]) // DateTime('Europe/Moscow')
 	location, err := time.LoadLocation(tzString)
@@ -230,7 +230,7 @@ func getDateTime64Param(t CHColumnType) (int, *time.Location, error) {
 		return 0, nil, err
 	}
 	if len(params) == 1 {
-		return int(precision), time.Local, nil
+		return int(precision), nil, nil
 	}
 	tz, err := time.LoadLocation(strings.Trim(params[1], "'"))
 	if err != nil {

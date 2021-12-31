@@ -13,6 +13,9 @@ func (g *GatewayConn) GetResponseStream(ctx context.Context) <-chan response.Pac
 
 	go func() {
 		defer close(responseChannel)
+		defer func() {
+			g.inQuery = false
+		}()
 
 		for {
 			select {
@@ -21,7 +24,7 @@ func (g *GatewayConn) GetResponseStream(ctx context.Context) <-chan response.Pac
 			default:
 			}
 
-			resp, err := response.ReadPacket(g.decoder, g.compress, data.ClickHouseRevision)
+			resp, err := response.ReadPacketWithLocation(g.decoder, g.compress, data.ClickHouseRevision, g.serverInfo.Timezone)
 			if err != nil {
 				responseChannel <- &response.ExceptionPacket{
 					Message: err.Error(),
@@ -37,4 +40,23 @@ func (g *GatewayConn) GetResponseStream(ctx context.Context) <-chan response.Pac
 	}()
 
 	return responseChannel
+}
+
+// SendQueryAssertNoError sends query to server, flushes all response from
+// server, returning error if any.
+func (g *GatewayConn) SendQueryAssertNoError(ctx context.Context, query string) error {
+	if err := g.SendQuery(query); err != nil {
+		return err
+	}
+	return g.FlushServerResponses(ctx)
+}
+
+// FlushServerResponses discards all server response, returning exception if any.
+func (g *GatewayConn) FlushServerResponses(ctx context.Context) error {
+	for res := range g.GetResponseStream(ctx) {
+		if res, ok := res.(*response.ExceptionPacket); ok {
+			return res
+		}
+	}
+	return nil
 }

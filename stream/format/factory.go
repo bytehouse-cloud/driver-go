@@ -30,10 +30,11 @@ var Formats = map[int]string{
 type BlockStreamFmtReader interface {
 	// BlockStreamFmtRead starts reading blocks, return stream of blocks to be consumed.
 	// if ctx is cancelled, read will stop asap and channel will be closed
-	BlockStreamFmtRead(ctx context.Context, sample *data.Block, blockSize int) <-chan *data.Block
 	// Yield blocks until the last BlockStreamFmtRead is completed
 	// return total rows notFirstRow and error if any
-	Yield() (int, error)
+	BlockStreamFmtRead(
+		ctx context.Context, sample *data.Block, blockSize int,
+	) (blockStream <-chan *data.Block, yield func() (int, error))
 }
 
 func BlockStreamFmtReaderFactory(fmtType string, r io.Reader, settings map[string]interface{}) (BlockStreamFmtReader, error) {

@@ -264,11 +264,11 @@ func Test_getDateTimeLocation(t *testing.T) {
 		want *time.Location
 	}{
 		{
-			name: "Test if no location will return local",
+			name: "Test if no location will return nil",
 			args: args{
 				t: "DateTime",
 			},
-			want: time.Local,
+			want: nil,
 		},
 		{
 			name: "Test if have location can get location",
@@ -311,12 +311,12 @@ func Test_getDateTime64Param(t *testing.T) {
 		wantLocation  *time.Location
 	}{
 		{
-			name: "Test if no location will return local",
+			name: "Test if no location will return nil",
 			args: args{
 				t: "DateTime64(10)",
 			},
 			wantPrecision: 10,
-			wantLocation:  time.Local,
+			wantLocation:  nil,
 		},
 		{
 			name: "Test if have location can get location",

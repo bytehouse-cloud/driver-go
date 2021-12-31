@@ -7,14 +7,13 @@ import (
 	"github.com/bytehouse-cloud/driver-go/driver/lib/bytepool"
 	"github.com/bytehouse-cloud/driver-go/driver/lib/data"
 	"github.com/bytehouse-cloud/driver-go/driver/lib/data/column"
-	"github.com/bytehouse-cloud/driver-go/errors"
 	"github.com/bytehouse-cloud/driver-go/stream/format/helper"
 )
 
 const (
-	expectedByteButGot = "expected character: %q, got: %q"
-	errorReadingByte   = "error while trying to read %q, %s"
-	readElemErr        = "error reading %v for column %v at index %v: %s"
+	errExpectedByteButGot = "error: expected byte: %q, got: %q"
+	errReadingByte        = "error while trying to read %q, %s"
+	errReadElem           = "error reading %v for column %v at index %v: %s"
 )
 
 func NewValuesBlockStreamReader(r io.Reader) *ValuesBlockStreamFmtReader {
@@ -25,121 +24,56 @@ func NewValuesBlockStreamReader(r io.Reader) *ValuesBlockStreamFmtReader {
 
 type ValuesBlockStreamFmtReader struct {
 	zReader *bytepool.ZReader
-
-	totalRowsRead int
-	exception     error
-	done          chan struct{}
 }
 
-func (v *ValuesBlockStreamFmtReader) BlockStreamFmtRead(ctx context.Context, sample *data.Block, blockSize int) <-chan *data.Block {
-	v.done = make(chan struct{}, 1)
-	return helper.ReadColumnTextsToBlockStream(ctx, sample, blockSize, v, &v.exception, &v.totalRowsRead, func() {
-		v.done <- struct{}{}
-	})
+func (v *ValuesBlockStreamFmtReader) BlockStreamFmtRead(ctx context.Context, sample *data.Block, blockSize int,
+) (blockStream <-chan *data.Block, yield func() (int, error)) {
+	return helper.TableToBlockStream(ctx, sample, blockSize, v)
 }
 
-func (v *ValuesBlockStreamFmtReader) Yield() (int, error) {
-	<-v.done
-	return v.totalRowsRead, v.exception
+func (v *ValuesBlockStreamFmtReader) ReadFirstColumnTexts(fb *bytepool.FrameBuffer, numRows int, cols []*column.CHColumn) (int, error) {
+	return helper.ReadFirstColumnTexts(fb, numRows, cols, v)
 }
 
-func (v *ValuesBlockStreamFmtReader) ReadFirstColumnTexts(colTexts [][]string, cols []*column.CHColumn) (int, error) {
-	return helper.ReadFirstColumnTexts(colTexts, cols, v)
+func (v *ValuesBlockStreamFmtReader) ReadColumnTextsCont(fb *bytepool.FrameBuffer, numRows int, cols []*column.CHColumn) (int, error) {
+	return helper.ReadColumnTextsCont(fb, numRows, cols, v)
 }
 
-func (v *ValuesBlockStreamFmtReader) ReadColumnTextsCont(colTexts [][]string, cols []*column.CHColumn) (int, error) {
-	return helper.ReadColumnTextsCont(colTexts, cols, v)
+func (v *ValuesBlockStreamFmtReader) readRow(fb *bytepool.FrameBuffer, cols []*column.CHColumn) error {
+	if err := helper.AssertNextByteEqual(v.zReader, '('); err != nil {
+		return err
+	}
+	if err := helper.ReadRow(fb, cols, v); err != nil {
+		return err
+	}
+	return helper.AssertNextByteEqual(v.zReader, ')')
 }
 
-func (v *ValuesBlockStreamFmtReader) readRow(colTexts [][]string, rowIdx int, cols []*column.CHColumn) error {
-	if err := v.readOpenBracket(); err != nil {
+func (v *ValuesBlockStreamFmtReader) ReadFirstRow(fb *bytepool.FrameBuffer, cols []*column.CHColumn) error {
+	return v.readRow(fb, cols)
+}
+
+func (v *ValuesBlockStreamFmtReader) ReadRowCont(fb *bytepool.FrameBuffer, cols []*column.CHColumn) error {
+	if err := helper.AssertNextByteEqual(v.zReader, ','); err != nil {
 		if err != io.EOF {
-			err = errors.ErrorfWithCaller("error reading open bracket: %s", err)
-		}
-		return err
-	}
-
-	for colIdx := 0; colIdx < len(colTexts)-1; colIdx++ {
-		s, err := v.readElem(cols[colIdx], false)
-		if err != nil {
-			return errors.ErrorfWithCaller(readElemErr, cols[colIdx].Type, cols[colIdx].Name, colIdx, err)
-		}
-		colTexts[colIdx][rowIdx] = s
-
-		if err := v.readComma(); err != nil {
-			return errors.ErrorfWithCaller(errorReadingByte, ',', err)
+			v.zReader.UnreadCurrentBuffer(1)
 		}
 	}
-
-	lastCol := cols[len(cols)-1]
-	s, err := v.readElem(lastCol, true)
-	if err != nil {
-		return errors.ErrorfWithCaller(readElemErr, lastCol.Type, lastCol.Name, len(cols)-1, err)
-	}
-	colTexts[len(cols)-1][rowIdx] = s
-
-	if err := v.readCloseBracket(); err != nil {
-		return errors.ErrorfWithCaller("error reading close bracket: %s", err)
-	}
-
-	return nil
+	return v.readRow(fb, cols)
 }
 
-func (v *ValuesBlockStreamFmtReader) ReadFirstRow(colTexts [][]string, cols []*column.CHColumn) error {
-	return v.readRow(colTexts, 0, cols)
+func (v *ValuesBlockStreamFmtReader) ReadElem(fb *bytepool.FrameBuffer, cols []*column.CHColumn, idx int) error {
+	if idx > 0 {
+		if err := helper.AssertNextByteEqual(v.zReader, ','); err != nil {
+			return err
+		}
+	}
+	return v.readElem(fb, cols[idx], (len(cols)-1 == idx))
 }
 
-func (v *ValuesBlockStreamFmtReader) ReadRowCont(colTexts [][]string, rowIdx int, cols []*column.CHColumn) error {
-	v.readOptionalComma()
-	return v.readRow(colTexts, rowIdx, cols)
-}
-
-func (v *ValuesBlockStreamFmtReader) readOpenBracket() error {
-	b, err := helper.ReadNextNonSpaceByte(v.zReader)
-	if err != nil {
-		return err
-	}
-	if b != '(' {
-		return errors.ErrorfWithCaller(expectedByteButGot, '(', b)
-	}
-	return nil
-}
-
-func (v *ValuesBlockStreamFmtReader) readCloseBracket() error {
-	b, err := helper.ReadNextNonSpaceByte(v.zReader)
-	if err != nil {
-		return err
-	}
-	if b != ')' {
-		return errors.ErrorfWithCaller(expectedByteButGot, ')', b)
-	}
-	return nil
-}
-
-func (v *ValuesBlockStreamFmtReader) readComma() error {
-	b, err := helper.ReadNextNonSpaceByte(v.zReader)
-	if err != nil {
-		return err
-	}
-	if b != ',' {
-		return errors.ErrorfWithCaller(expectedByteButGot, ',', b)
-	}
-	return nil
-}
-
-func (v *ValuesBlockStreamFmtReader) readOptionalComma() {
-	b, err := helper.ReadNextNonSpaceByte(v.zReader)
-	if err != nil {
-		return
-	}
-	if b != ',' {
-		v.zReader.UnreadCurrentBuffer(1)
-	}
-}
-
-func (v *ValuesBlockStreamFmtReader) readElem(col *column.CHColumn, last bool) (string, error) {
+func (v *ValuesBlockStreamFmtReader) readElem(fb *bytepool.FrameBuffer, col *column.CHColumn, last bool) error {
 	if last {
-		return helper.ReadCHElem(v.zReader, col, ')')
+		return helper.ReadCHElemTillStop(fb, v.zReader, col, ')')
 	}
-	return helper.ReadCHElem(v.zReader, col, ',')
+	return helper.ReadCHElemTillStop(fb, v.zReader, col, ',')
 }

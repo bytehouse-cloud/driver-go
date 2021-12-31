@@ -11,7 +11,7 @@ import (
 
 type (
 	SendBlock    func(b *data.Block) error
-	CancelInsert func() error
+	CancelInsert func()
 	Logf         func(s string, args ...interface{})
 	CallBackResp func(resp response.Packet)
 )
@@ -111,10 +111,9 @@ func (p *InsertProcess) watchEvents(ctx context.Context) error {
 	for {
 		select {
 		case <-ctx.Done():
-			if err := p.cancelInsert(); err != nil {
-				return err
-			}
-			ctx = context.Background()
+			p.cancelInsert()
+			return context.Canceled
+
 		case resp := <-p.serverResponses:
 			switch resp := resp.(type) {
 			case *response.ExceptionPacket:

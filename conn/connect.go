@@ -1,7 +1,6 @@
 package conn
 
 import (
-	"bufio"
 	"crypto/tls"
 	errors2 "errors"
 	"net"
@@ -87,8 +86,7 @@ func dial(configs *ConnConfig) (*connect, error) {
 				Conn:         conn,
 				logf:         configs.logf,
 				ident:        ident,
-				zReader:      bytepool.NewZReaderDefault(conn),
-				readTimeout:  configs.readTimeout,
+				zReader:      bytepool.NewZReaderDefault(NewRefreshReader(conn, configs.readTimeout)),
 				writeTimeout: configs.writeTimeout,
 			}, nil
 		} else {
@@ -111,7 +109,6 @@ type connect struct {
 	net.Conn
 	logf         func(string, ...interface{})
 	ident        int
-	buffer       *bufio.Reader
 	closed       bool
 	readTimeout  time.Duration
 	writeTimeout time.Duration
@@ -120,7 +117,6 @@ type connect struct {
 
 func (conn *connect) Read(b []byte) (int, error) {
 	err := conn.zReader.ReadFull(b)
-	_ = conn.SetReadDeadline(time.Now().Add(conn.readTimeout))
 	return len(b), err
 }
 
@@ -128,7 +124,12 @@ func (conn *connect) ReadUvarint() (uint64, error) {
 	return conn.zReader.ReadUvarint()
 }
 
+func (conn *connect) resetReadTimeout() {
+	conn.SetReadDeadline(time.Now().Add(conn.readTimeout))
+}
+
 func (conn *connect) Write(b []byte) (int, error) {
+	defer conn.resetWriteTimeout()
 	var (
 		n      int
 		err    error
@@ -140,9 +141,12 @@ func (conn *connect) Write(b []byte) (int, error) {
 			return n, err
 		}
 		total += n
-		_ = conn.SetWriteDeadline(time.Now().Add(conn.writeTimeout))
 	}
 	return n, nil
+}
+
+func (conn *connect) resetWriteTimeout() {
+	conn.SetWriteDeadline(time.Now().Add(conn.writeTimeout))
 }
 
 func (conn *connect) Close() error {

@@ -1,7 +1,6 @@
 package sdk
 
 import (
-	"errors"
 	"fmt"
 	"testing"
 	"time"
@@ -26,11 +25,12 @@ func TestParseDSN(t *testing.T) {
 		logger       func(s string, i ...interface{})
 	}
 	tests := []struct {
-		name     string
-		args     args
-		want     *Config
-		wantOpts []conn.OptionConfig
-		wantErr  error
+		name              string
+		args              args
+		want              *Config
+		wantOpts          []conn.OptionConfig
+		wantQuerySettings map[string]interface{}
+		wantErr           bool
 	}{
 		{
 			name: "Can parse simple dsn",
@@ -39,26 +39,64 @@ func TestParseDSN(t *testing.T) {
 			},
 			want: &Config{
 				databaseName:   "",
-				authentication: conn.NewAuthentication("", "default", ""),
-				querySettings:  map[string]string{},
+				authentication: conn.NewPasswordAuthentication("default", ""),
+				querySettings:  map[string]interface{}{},
 			},
 			wantOpts: []conn.OptionConfig{
 				conn.OptionHostName(":"),
 			},
 		},
 		{
-			name: "Can accept region and map accordingly",
+			name: "Can accept region with no volcano flag false and map accordingly",
 			args: args{
-				dsn: "?region=" + conn.CnNorth1,
+				dsn: "?region=" + conn.RegionCnNorth1 + "&volcano=false",
 			},
 			want: &Config{
 				databaseName:   "",
-				authentication: conn.NewAuthentication("", "default", ""),
-				querySettings:  map[string]string{},
+				authentication: conn.NewPasswordAuthentication("default", ""),
+				querySettings:  map[string]interface{}{},
 			},
 			wantOpts: []conn.OptionConfig{
 				conn.OptionHostName("gateway.aws-cn-north-1.bytehouse.cn:19000"),
+				conn.OptionSecure(true),
 			},
+		},
+		{
+			name: "Can accept region and map accordingly",
+			args: args{
+				dsn: "?region=" + conn.RegionCnNorth1,
+			},
+			want: &Config{
+				databaseName:   "",
+				authentication: conn.NewPasswordAuthentication("default", ""),
+				querySettings:  map[string]interface{}{},
+			},
+			wantOpts: []conn.OptionConfig{
+				conn.OptionHostName("gateway.aws-cn-north-1.bytehouse.cn:19000"),
+				conn.OptionSecure(true),
+			},
+		},
+		{
+			name: "Can accept volcano region and map accordingly",
+			args: args{
+				dsn: "?region=" + conn.RegionBoe + "&volcano=true",
+			},
+			want: &Config{
+				databaseName:   "",
+				authentication: conn.NewPasswordAuthentication("default", ""),
+				querySettings:  map[string]interface{}{},
+			},
+			wantOpts: []conn.OptionConfig{
+				conn.OptionHostName("gateway.volc-boe.offline.bytehouse.cn:19000"),
+				conn.OptionSecure(true),
+			},
+		},
+		{
+			name: "Can reject volcano region if no volcano flag is given",
+			args: args{
+				dsn: "?region=" + conn.RegionBoe,
+			},
+			wantErr: true,
 		},
 		{
 			name: "Can override host",
@@ -70,8 +108,8 @@ func TestParseDSN(t *testing.T) {
 			},
 			want: &Config{
 				databaseName:   "",
-				authentication: conn.NewAuthentication("", "default", ""),
-				querySettings:  map[string]string{},
+				authentication: conn.NewPasswordAuthentication("default", ""),
+				querySettings:  map[string]interface{}{},
 			},
 			wantOpts: []conn.OptionConfig{
 				conn.OptionLogf(defaultLog),
@@ -81,14 +119,15 @@ func TestParseDSN(t *testing.T) {
 		{
 			name: "Can parse simple dsn with params",
 			args: args{
-				dsn: "user:password@protocol(address)/dbname?secure=true&write_timeout=100s&pool_size=2&target_account=10&replication_alter_columns_timeout=1",
+				dsn: "user:password@protocol(address)/dbname?secure=true&write_timeout=100s&pool_size=2&target_account=10&replication_alter_columns_timeout=1&skip_history=true",
 			},
 			want: &Config{
 				databaseName:   "",
-				authentication: conn.NewAuthentication("", "default", ""),
+				authentication: conn.NewPasswordAuthentication("default", ""),
 				compress:       false,
-				querySettings: map[string]string{
-					"replication_alter_columns_timeout": "1",
+				querySettings: map[string]interface{}{
+					"replication_alter_columns_timeout": uint64(1),
+					"skip_history":                      true,
 				},
 			},
 			wantOpts: []conn.OptionConfig{
@@ -102,21 +141,74 @@ func TestParseDSN(t *testing.T) {
 			args: args{
 				dsn: "://usernafewfweijoofjewo/few?few***",
 			},
-			wantErr: errors.New("driver-go(sdk.ParseDSN): host port resolution error = parse \"://usernafewfweijoofjewo/few?few***\": missing protocol scheme"),
+			wantErr: true,
+		},
+		{
+			name: "can accept user and password",
+			args: args{
+				dsn: "?user=mary&password=mary_password",
+			},
+			want: &Config{
+				authentication: conn.NewPasswordAuthentication("mary", "mary_password"),
+				querySettings:  map[string]interface{}{},
+			},
+			wantOpts: []conn.OptionConfig{
+				conn.OptionHostName(":"),
+			},
+		},
+		{
+			name: "If access key without region then err",
+			args: args{
+				dsn: "?access_key=abc&secret_key=def",
+			},
+			wantErr: true,
+		},
+		{
+			name: "If access key without secret_key then err",
+			args: args{
+				dsn: "?access_key=abc&region=cn-north-1",
+			},
+			wantErr: true,
+		},
+		{
+			name: "Can accept signature authentication",
+			args: args{
+				dsn: "?access_key=AK1899200289&secret_key=SK90189ASHUSHU17823&region=cn-north-1",
+			},
+			want: &Config{
+				authentication: conn.NewSignatureAuthentication("AK1899200289", "SK90189ASHUSHU17823", "cn-north-1"),
+				querySettings:  map[string]interface{}{},
+			},
+			wantOpts: []conn.OptionConfig{
+				conn.OptionRegion(conn.RegionCnNorth1),
+			},
+		},
+		{
+			name: "Can accept system Authentication",
+			args: args{
+				dsn: "?token=abc123&is_system=true",
+			},
+			want: &Config{
+				authentication: conn.NewSystemAuthentication("abc123"),
+				querySettings:  map[string]interface{}{},
+			},
+			wantOpts: []conn.OptionConfig{
+				conn.OptionHostName(":"),
+			},
 		},
 		{
 			name: "Can throw ioErr if invalid compress",
 			args: args{
 				dsn: "user:password@protocol(address)/dbname?compress=hi",
 			},
-			wantErr: errors.New("driver-go(sdk.ParseDSN): error parsing compress parameter as bool = strconv.ParseBool: parsing \"hi\": invalid syntax"),
+			wantErr: true,
 		},
 		{
 			name: "Can throw ioErr if invalid duration",
 			args: args{
 				dsn: "user:password@protocol(address)/dbname?secure=true&write_timeout=100&pool_size=2",
 			},
-			wantErr: errors.New("driver-go(sdk.ParseDSN): makeConnConfigs error = driver-go(sdk.makeConnConfigs): error parsing time.Duration for 100, parameter = time: missing unit in duration \"100\""),
+			wantErr: true,
 		},
 	}
 	for _, tt := range tests {
@@ -125,13 +217,12 @@ func TestParseDSN(t *testing.T) {
 				tt.args.logger = defaultLog
 			}
 			got, err := ParseDSN(tt.args.dsn, tt.args.hostOverride, tt.args.logger)
-			if tt.wantErr != nil {
-				require.Error(t, err)
-				require.Equal(t, tt.wantErr.Error(), err.Error())
-				return
+			if err != nil {
+				if tt.wantErr {
+					return
+				}
+				require.NoError(t, err)
 			}
-			require.NoError(t, err)
-
 			require.Equal(t, tt.want.databaseName, got.databaseName)
 
 			// Conn options check

@@ -3,7 +3,6 @@ package conn
 import (
 	"crypto/tls"
 	"fmt"
-	"reflect"
 	"testing"
 	"time"
 
@@ -12,8 +11,6 @@ import (
 )
 
 func TestNewConnConfig(t *testing.T) {
-	tlsConfDefault := &tls.Config{}
-
 	tests := []struct {
 		name    string
 		opts    []OptionConfig
@@ -22,7 +19,14 @@ func TestNewConnConfig(t *testing.T) {
 	}{
 		{
 			name: "given no config then no error",
-			want: &ConnConfig{logf: noLog},
+			want: &ConnConfig{
+				tlsConfig:    tlsConfDefault,
+				connTimeout:  time.Second,
+				readTimeout:  time.Minute,
+				writeTimeout: time.Minute,
+				dialStrategy: DialRandom,
+				logf:         noLog,
+			},
 		},
 		{
 			name:    "given invalid region then error",
@@ -42,7 +46,7 @@ func TestNewConnConfig(t *testing.T) {
 		{
 			name: "given full config then match same",
 			opts: []OptionConfig{
-				OptionRegion(ApSouthEast1),
+				OptionRegion(RegionApSouthEast1),
 				OptionConnTimeout(time.Second),
 				OptionReadTimeout(time.Second),
 				OptionWriteTimeout(time.Second),
@@ -70,13 +74,11 @@ func TestNewConnConfig(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			got, err := NewConnConfig(tt.opts...)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("NewConnConfig() error = %v, wantErr %v", err, tt.wantErr)
+			if tt.wantErr && err != nil {
 				return
 			}
-			if !reflect.DeepEqual(fmt.Sprint(got), fmt.Sprint(tt.want)) {
-				t.Errorf("NewConnConfig() got = %v, want %v", got, tt.want)
-			}
+
+			assert.Equal(t, fmt.Sprint(got), fmt.Sprint(tt.want))
 		})
 	}
 }

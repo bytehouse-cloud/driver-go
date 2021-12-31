@@ -2,7 +2,6 @@ package column
 
 import (
 	"bytes"
-	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -150,7 +149,6 @@ func TestTupleColumnData_ReadFromTexts(t *testing.T) {
 			i := MustMakeColumnData(tt.columnType, 1000)
 
 			got, err := i.ReadFromTexts(tt.args.texts)
-			fmt.Println(err)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("ReadFromTexts() error = %v, wantErr %v", err, tt.wantErr)
 				return
@@ -300,7 +298,6 @@ func TestTupleColumnData_ReadFromValues(t *testing.T) {
 			i := MustMakeColumnData(tt.columnType, 1000)
 
 			got, err := i.ReadFromValues(tt.args.values)
-			fmt.Println(err)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("ReadFromValues() error = %v, wantErr %v", err, tt.wantErr)
 				return

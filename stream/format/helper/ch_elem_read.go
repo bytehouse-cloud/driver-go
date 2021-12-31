@@ -3,7 +3,8 @@ package helper
 import (
 	"bytes"
 	"encoding/hex"
-	"strings"
+	"fmt"
+	"io"
 
 	"github.com/bytehouse-cloud/driver-go/driver/lib/bytepool"
 	"github.com/bytehouse-cloud/driver-go/driver/lib/data/column"
@@ -11,88 +12,105 @@ import (
 
 const backSlash = '\\'
 
-func ReadCHElem(z *bytepool.ZReader, col *column.CHColumn, stop byte) (string, error) {
+func ReadCHElemTillStop(w Writer, z *bytepool.ZReader, col *column.CHColumn, stop byte) error {
 	switch col.Data.(type) {
 	case *column.StringColumnData, *column.FixedStringColumnData:
-		return readString(z, stop)
+		return readString(w, z, stop)
 	case *column.ArrayColumnData:
-		return readArray(z)
+		return readArray(w, z)
 	default:
-		defer z.UnreadCurrentBuffer(1)
-		return ReadStringUntilByte(z, stop)
+		return readRawTillStop(w, z, stop)
 	}
 }
 
-func readString(z *bytepool.ZReader, stop byte) (string, error) {
-	b, err := ReadNextNonSpaceByte(z)
+// readRawTillStop reads until(excluding) stop byte or EOF
+// writes content into w, excluding stop byte
+func readRawTillStop(w Writer, z *bytepool.ZReader, stop byte) error {
+	_, err := ReadStringUntilByte(w, z, stop)
 	if err != nil {
-		return emptyString, err
-	}
-	switch b {
-	case backTick, doubleQuote, singleQuote:
-		return readStringUntilByteEscaped(z, b)
+		if err == io.EOF {
+			return nil
+		}
+		return err
 	}
 
 	z.UnreadCurrentBuffer(1)
-	defer z.UnreadCurrentBuffer(1)
-	return ReadStringUntilByte(z, stop)
+	return nil
 }
 
-func readArray(z *bytepool.ZReader) (string, error) {
+func readString(w Writer, z *bytepool.ZReader, stop byte) error {
+	b, err := ReadNextNonSpaceByte(z)
+	if err != nil {
+		return err
+	}
+	switch b {
+	case backTick, doubleQuote, singleQuote:
+		return readStringUntilByteEscaped(w, z, b)
+	default:
+		z.UnreadCurrentBuffer(1) // next byte not a quote
+	}
+
+	// begin reading unquoted string
+	if _, err := ReadStringUntilByte(w, z, stop); err != nil {
+		return err
+	}
+
+	z.UnreadCurrentBuffer(1)
+	return nil
+}
+
+func readArray(w Writer, z *bytepool.ZReader) error {
 	b, err := ReadNextNonSpaceByte(z)
 	if b != squareOpenBrace {
 		z.UnreadCurrentBuffer(1) // if not open square bracket then current value should be empty string ""
-		return emptyString, err
+		return err
 	}
 
-	var sb strings.Builder
-	sb.WriteByte(squareOpenBrace)
+	w.WriteByte(squareOpenBrace)
 	squareBraceCount := 1
 	for {
 		b, err = z.ReadByte()
 		switch b {
 		case backTick, doubleQuote, singleQuote:
-			sb.WriteByte(b)
-			s, err := readStringUntilByteEscaped(z, b)
+			w.WriteByte(b)
+			err := readStringUntilByteEscaped(w, z, b)
 			if err != nil {
-				return emptyString, err
+				return err
 			}
-			sb.WriteString(s)
 		case curlyOpenBrace:
-			sb.WriteByte(b)
+			w.WriteByte(b)
 			b = curlyCloseBrace
-			s, err := readStringUntilByteEscaped(z, b)
+			err := readStringUntilByteEscaped(w, z, b)
 			if err != nil {
-				return emptyString, err
+				return err
 			}
-			sb.WriteString(s)
 		case squareOpenBrace:
 			squareBraceCount++
 		case squareCloseBrace:
 			squareBraceCount--
 		}
-		sb.WriteByte(b)
+		w.WriteByte(b)
 
 		if squareBraceCount == 0 {
 			break
 		}
 	}
-	return sb.String(), nil
+	return nil
 }
 
 // readStringUntilByteEscaped is the same as ReadStringUntilByte, however backslash character is handled as escaped
-func readStringUntilByteEscaped(z *bytepool.ZReader, b byte) (string, error) {
-	var yieldFromBuilder func(builder *strings.Builder) (string, error)
-	yieldFromBuilder = func(builder *strings.Builder) (string, error) {
+func readStringUntilByteEscaped(w Writer, z *bytepool.ZReader, b byte) error {
+	var yieldFromBuilder func(w Writer) error
+	yieldFromBuilder = func(w Writer) error {
 		buf, err := z.ReadNextBuffer()
 		if err != nil {
-			return emptyString, err
+			return err
 		}
 
 		pos, isBackSlash := findBytePositionOrBackSlash(buf, b)
 		if pos < 0 {
-			builder.Write(buf)
-			return yieldFromBuilder(builder)
+			w.Write(buf)
+			return yieldFromBuilder(w)
 		}
 
 		z.UnreadCurrentBuffer(len(buf) - pos - 1) // pause reading for processing of stop characters
@@ -103,35 +121,21 @@ func readStringUntilByteEscaped(z *bytepool.ZReader, b byte) (string, error) {
 			resultBuf := escapedBuf[:n]
 			if !ok {
 				if j := bytes.IndexByte(escapedBuf, b); j > 0 { // rare edge case where stop byte appears in escape buf, eg. \x',
-					builder.Write(resultBuf[:j])
+					w.Write(resultBuf[:j])
 					defer z.PrependCurrentBuffer(resultBuf[j:])
-					return builder.String(), nil
+					return nil
 				}
 			}
-			builder.Write(escapedBuf[:n])
-			return yieldFromBuilder(builder) //  read again after handling escape
+			w.Write(escapedBuf[:n])
+			return yieldFromBuilder(w) //  read again after handling escape
 		}
 
-		builder.Write(buf[:pos])
-		return builder.String(), nil
+		w.Write(buf[:pos])
+		return nil
 	}
 
-	return yieldFromBuilder(&strings.Builder{})
+	return yieldFromBuilder(w)
 }
-
-//// findNonSpaceOrNewLine is similar to findNonSpace but does not include new line character as space
-//func findNonSpaceOrNewLine(buf []byte) int {
-//	var i int
-//	for i = 0; i < len(buf); i++ {
-//		switch buf[i] {
-//		case '\t', '\f', '\r', '\v', ' ':
-//			continue
-//		}
-//
-//		break
-//	}
-//	return i
-//}
 
 // attempts to read escaped character after backslash.
 // return number of bytes read and if operation is successful
@@ -204,28 +208,30 @@ func readHexEscaped(z *bytepool.ZReader, buf []byte) (int, bool) {
 	return n, true
 }
 
-// ReadStringUntilByte reads content of buffer until until given byte appear.
-// Returns string read (not including the byte), and error if any
-func ReadStringUntilByte(z *bytepool.ZReader, b byte) (string, error) {
+// ReadStringUntilByte reads content of buffer until including given byte appear or EOF
+// Write the bytes into Writer
+// Returns number of bytes (excluding quote) written and error
+func ReadStringUntilByte(w Writer, z *bytepool.ZReader, b byte) (int, error) {
+	var totalRead int
+
 	buf, err := z.ReadNextBuffer()
 	if err != nil {
-		return emptyString, err
+		return 0, err
 	}
 
-	var (
-		builder strings.Builder
-		i       int
-	)
+	var i int
 	for i = bytes.IndexByte(buf, b); i == -1; i = bytes.IndexByte(buf, b) {
-		builder.Write(buf)
+		n, _ := w.Write(buf)
+		totalRead += n
 		if buf, err = z.ReadNextBuffer(); err != nil {
-			return builder.String(), err
+			return totalRead, err
 		}
 	}
-	builder.Write(buf[:i])
+	n, _ := w.Write(buf[:i])
+	totalRead += n
 
 	z.UnreadCurrentBuffer(len(buf) - i - 1)
-	return builder.String(), nil
+	return totalRead, nil
 }
 
 // Unused function
@@ -298,4 +304,24 @@ func DiscardUntilByteEscaped(z *bytepool.ZReader, stop byte) error {
 	}
 
 	return DiscardUntilByteEscaped(z, stop)
+}
+
+// AssertNextByteEqual reads the next non space byte from z
+// throws error if byte is not same as expect
+func AssertNextByteEqual(z *bytepool.ZReader, expect byte) error {
+	next, err := ReadNextNonSpaceByte(z)
+	if err != nil {
+		return err
+	}
+	if next != expect {
+		return fmt.Errorf("expect byte: %q, but got: %q", expect, next)
+	}
+	return nil
+}
+
+func FlushZReader(z *bytepool.ZReader) {
+	var err error
+	for err == nil {
+		_, err = z.ReadNextBuffer()
+	}
 }

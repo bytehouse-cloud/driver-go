@@ -244,14 +244,14 @@ func TestValuesBlockStreamFmtReader_BlockStreamFmtRead(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			blockStream := tt.blockStreamReader.BlockStreamFmtRead(tt.args.ctx, tt.args.sample, tt.args.blockSize)
+			blockStream, yield := tt.blockStreamReader.BlockStreamFmtRead(tt.args.ctx, tt.args.sample, tt.args.blockSize)
 			var nBlocks int
 			for range blockStream {
 				nBlocks++
 			}
 			require.Equal(t, nBlocks, tt.wantBlocksRead)
 
-			nRows, err := tt.blockStreamReader.Yield()
+			nRows, err := yield()
 			if tt.wantErr {
 				require.Error(t, err)
 				return

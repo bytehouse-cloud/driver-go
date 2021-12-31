@@ -54,7 +54,7 @@ func (d *DateTime64ColumnData) ReadFromTexts(texts []string) (int, error) {
 		err error
 	)
 
-	parseTime := interpretTimeFormat([]string{dateFormat, dateTimeFormat, dateTime64Format}, texts, time.Local)
+	parseTime := interpretTimeFormat([]string{dateFormat, dateTimeFormat, dateTime64Format}, texts, d.timeZone)
 
 	for i, text := range texts {
 		if text == "" {
@@ -75,7 +75,10 @@ func (d *DateTime64ColumnData) ReadFromTexts(texts []string) (int, error) {
 func (d *DateTime64ColumnData) get(row int) time.Time {
 	timeValue := int64(bufferRowToUint64(d.raw, row))
 	timeValue *= int64(math.Pow10(9 - d.precision))
-	return time.Unix(0, timeValue).In(d.timeZone)
+	if d.timeZone != nil {
+		return time.Unix(0, timeValue).In(d.timeZone)
+	}
+	return time.Unix(0, timeValue)
 }
 
 func (d *DateTime64ColumnData) GetValue(row int) interface{} {
@@ -83,7 +86,7 @@ func (d *DateTime64ColumnData) GetValue(row int) interface{} {
 }
 
 func (d *DateTime64ColumnData) GetString(row int) string {
-	return d.get(row).In(d.timeZone).Format(dateTime64Format)
+	return d.get(row).Format(dateTime64Format)
 }
 
 func (d *DateTime64ColumnData) Zero() interface{} {

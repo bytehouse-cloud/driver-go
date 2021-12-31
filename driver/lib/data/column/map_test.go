@@ -2,7 +2,6 @@ package column
 
 import (
 	"bytes"
-	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -198,7 +197,6 @@ func TestMapColumnData_ReadFromTexts(t *testing.T) {
 
 			got, err := i.ReadFromTexts(tt.args.texts)
 
-			fmt.Println(err)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("ReadFromTexts() error = %v, wantErr = %v", err, tt.wantErr)
 				return
@@ -344,7 +342,7 @@ func TestMapColumnData_ReadFromValues(t *testing.T) {
 			name:       "Should write data and return number of rows read with no error, struct as key",
 			columnType: "Map(Map(String, UInt8), UInt8)",
 			args: args{
-				values: []interface{}{map[DemoType]uint8{DemoType{Key: 2}: 8}, map[DemoType]uint8{DemoType{Key: 2}: 8}},
+				values: []interface{}{map[DemoType]uint8{{Key: 2}: 8}, map[DemoType]uint8{{Key: 2}: 8}},
 			},
 			wantDataWritten: []string{"{{'Key': 2}: 8}", "{{'Key': 2}: 8}"},
 			wantRowsRead:    2,
@@ -354,7 +352,7 @@ func TestMapColumnData_ReadFromValues(t *testing.T) {
 			name:       "Should convert struct with struct tag, struct as key",
 			columnType: "Map(Map(String, UInt8), UInt8)",
 			args: args{
-				values: []interface{}{map[DemoTypeWithTag]uint8{DemoTypeWithTag{Key: 2}: 8}, map[DemoTypeWithTag]uint8{DemoTypeWithTag{Key: 2}: 8}},
+				values: []interface{}{map[DemoTypeWithTag]uint8{{Key: 2}: 8}, map[DemoTypeWithTag]uint8{{Key: 2}: 8}},
 			},
 			wantDataWritten: []string{"{{'key': 2}: 8}", "{{'key': 2}: 8}"},
 			wantRowsRead:    2,

@@ -1,33 +1,45 @@
 package helper
 
-import "github.com/bytehouse-cloud/driver-go/driver/lib/data/column"
+import (
+	"github.com/bytehouse-cloud/driver-go/driver/lib/bytepool"
+	"github.com/bytehouse-cloud/driver-go/driver/lib/data/column"
+)
 
-type ColumnTextsReader interface {
-	ReadFirstRow(colTexts [][]string, cols []*column.CHColumn) error
-	ReadRowCont(colTexts [][]string, rowIdx int, cols []*column.CHColumn) error
+type RowReader interface {
+	ReadFirstRow(fb *bytepool.FrameBuffer, cols []*column.CHColumn) error
+	ReadRowCont(fb *bytepool.FrameBuffer, cols []*column.CHColumn) error
 }
 
-func ReadFirstColumnTexts(colTexts [][]string, cols []*column.CHColumn, rReader ColumnTextsReader) (int, error) {
-	var totalRowWrite int
-	if err := rReader.ReadFirstRow(colTexts, cols); err != nil {
+func ReadFirstColumnTexts(fb *bytepool.FrameBuffer, numRows int, cols []*column.CHColumn, rReader RowReader) (int, error) {
+	if numRows == 0 {
+		return 0, nil
+	}
+
+	fb.NewRow()
+	if err := rReader.ReadFirstRow(fb, cols); err != nil {
+		fb.DiscardCurrentRow()
 		return 0, err
 	}
-	totalRowWrite++
 
-	for i := 1; i < len(colTexts[0]); i++ {
-		if err := rReader.ReadRowCont(colTexts, i, cols); err != nil {
-			return totalRowWrite, err
+	totalRead := 1
+	for i := 1; i < numRows; i++ {
+		fb.NewRow()
+		if err := rReader.ReadRowCont(fb, cols); err != nil {
+			fb.DiscardCurrentRow()
+			return totalRead, err
 		}
-		totalRowWrite++
+		totalRead++
 	}
 
-	return totalRowWrite, nil
+	return totalRead, nil
 }
 
-func ReadColumnTextsCont(colTexts [][]string, cols []*column.CHColumn, rReader ColumnTextsReader) (int, error) {
+func ReadColumnTextsCont(fb *bytepool.FrameBuffer, numRows int, cols []*column.CHColumn, rReader RowReader) (int, error) {
 	var totalRead int
-	for i := 0; i < len(colTexts[0]); i++ {
-		if err := rReader.ReadRowCont(colTexts, i, cols); err != nil {
+	for i := 0; i < numRows; i++ {
+		fb.NewRow()
+		if err := rReader.ReadRowCont(fb, cols); err != nil {
+			fb.DiscardCurrentRow()
 			return totalRead, err
 		}
 		totalRead++

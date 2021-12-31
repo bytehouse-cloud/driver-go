@@ -69,7 +69,7 @@ func (s *StringColumnData) ReadFromValues(values []interface{}) (int, error) {
 			return i, NewErrInvalidColumnType(value, v)
 		}
 
-		s.raw[i] = sixb.StB(v)
+		s.raw[i] = sixb.StoB(v)
 	}
 
 	return len(values), nil
@@ -78,7 +78,8 @@ func (s *StringColumnData) ReadFromValues(values []interface{}) (int, error) {
 func (s *StringColumnData) ReadFromTexts(texts []string) (int, error) {
 	for i, text := range texts {
 		text = processString(text)
-		s.raw[i] = sixb.StB(text)
+		s.raw[i] = make([]byte, len(text))
+		copy(s.raw[i], text)
 	}
 	return len(texts), nil
 }

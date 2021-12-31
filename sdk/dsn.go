@@ -1,6 +1,7 @@
 package sdk
 
 import (
+	"errors"
 	"fmt"
 	"net/url"
 	"strconv"
@@ -10,12 +11,14 @@ import (
 	bytehouse "github.com/bytehouse-cloud/driver-go"
 	"github.com/bytehouse-cloud/driver-go/conn"
 	"github.com/bytehouse-cloud/driver-go/driver/lib/settings"
-	"github.com/bytehouse-cloud/driver-go/errors"
 	"github.com/bytehouse-cloud/driver-go/sdk/param"
 )
 
 var (
-	ErrParsingParamFmt       = "error parsing %T for %v, parameter = %v"
+	ErrParseParamFmt         = "dsn parse error, name: %v, type: %T, given: %v, error: %s"
+	ErrDsnMissingSecretKey   = errors.New("missing secret key in dsn")
+	ErrDsnMissingRegion      = errors.New("missing region in dsn")
+	ErrTokenAuthNotSupported = errors.New("token authentication not supported")
 	defaultConnectionTimeout = 3 * time.Second
 	defaultReadTimeout       = time.Minute
 	defaultWriteTimeout      = time.Minute
@@ -25,10 +28,9 @@ var (
 type Config struct {
 	connConfig     *conn.ConnConfig
 	databaseName   string
-	authentication *conn.Authentication
-	//impersonation  *conn.Impersonation
-	compress      bool
-	querySettings map[string]string
+	authentication conn.Authentication
+	compress       bool
+	querySettings  map[string]interface{}
 }
 
 type (
@@ -47,37 +49,37 @@ func ParseDSN(dsn string, hostOverride HostOverride, logf Logf) (*Config, error)
 
 	host, urlValues, err := parseAndResolveHost(dsn, hostOverride)
 	if err != nil {
-		return nil, errors.ErrorfWithCaller("host port resolution error = %v", err)
+		return nil, err
 	}
 
 	connOptions, err := makeConnConfigs(host, urlValues, logf)
 	if err != nil {
-		return nil, errors.ErrorfWithCaller("makeConnConfigs error = %v", err)
+		return nil, err
 	}
 
 	databaseName := urlValues.Get("database")
 
-	authentication := makeAuthentication(urlValues)
-
-	//impersonation, err := makeImpersonation(urlValues)
+	authentication, err := makeAuthentication(urlValues)
 	if err != nil {
-		return nil, errors.ErrorfWithCaller("makeImpersonation error = %v", err)
+		return nil, err
 	}
 
 	compress, err := parseBool(urlValues.Get(param.COMPRESS))
 	if err != nil {
-		return nil, errors.ErrorfWithCaller("error parsing compress parameter as bool = %v", err)
+		return nil, err
 	}
 
-	querySettings := makeQuerySettings(urlValues)
+	querySettings, err := makeQuerySettings(urlValues)
+	if err != nil {
+		return nil, err
+	}
 
 	return &Config{
 		connConfig:     connOptions,
 		databaseName:   databaseName,
 		authentication: authentication,
-		//impersonation:  impersonation,
-		compress:      compress,
-		querySettings: querySettings,
+		compress:       compress,
+		querySettings:  querySettings,
 	}, nil
 }
 
@@ -102,17 +104,20 @@ func parseAndResolveHost(dsn string, override func() (string, error)) (string, u
 	return fmt.Sprintf("%v:%v", dsnURL.Hostname(), dsnURL.Port()), dsnURL.Query(), nil
 }
 
-func makeQuerySettings(query url.Values) map[string]string {
-	qs := make(map[string]string)
+func makeQuerySettings(query url.Values) (map[string]interface{}, error) {
+	qs := make(map[string]interface{})
 
-	// set settings from dsn
 	for k := range query {
 		if _, ok := settings.Default[k]; ok {
-			qs[k] = query.Get(k)
+			v, err := settings.SettingToValue(k, query.Get(k))
+			if err != nil {
+				return nil, err
+			}
+			qs[k] = v
 		}
 	}
 
-	return qs
+	return qs, nil
 }
 
 func makeConnConfigs(host string, urlValues url.Values, logf func(s string, i ...interface{})) (*conn.ConnConfig, error) {
@@ -123,8 +128,20 @@ func makeConnConfigs(host string, urlValues url.Values, logf func(s string, i ..
 	}
 
 	if region := urlValues.Get(param.REGION); region != "" {
-		opts = append(opts, conn.OptionRegion(conn.Region(region)))
 		host = ""
+		if volcano := urlValues.Get(param.VOLCANO); volcano != "" {
+			isVolc, err := strconv.ParseBool(volcano)
+			if err != nil {
+				return nil, fmt.Errorf(ErrParseParamFmt, param.VOLCANO, isVolc, volcano, err)
+			}
+			if isVolc {
+				opts = append(opts, conn.OptionVolcano(region))
+			} else {
+				opts = append(opts, conn.OptionRegion(region))
+			}
+		} else {
+			opts = append(opts, conn.OptionRegion(region))
+		}
 	}
 
 	if host != "" {
@@ -148,7 +165,7 @@ func makeConnConfigs(host string, urlValues url.Values, logf func(s string, i ..
 	if secure := urlValues.Get(param.SECURE); secure != "" {
 		b, err := strconv.ParseBool(secure)
 		if err != nil {
-			return nil, errors.ErrorfWithCaller(ErrParsingParamFmt, b, secure, err)
+			return nil, fmt.Errorf(ErrParseParamFmt, param.SECURE, b, secure, err)
 		}
 		opts = append(opts, conn.OptionSecure(b))
 	}
@@ -156,7 +173,7 @@ func makeConnConfigs(host string, urlValues url.Values, logf func(s string, i ..
 	if skipVerification := urlValues.Get(param.SKIP_VERIFICATION); skipVerification != "" {
 		b, err := strconv.ParseBool(skipVerification)
 		if err != nil {
-			return nil, errors.ErrorfWithCaller(ErrParsingParamFmt, b, skipVerification, err)
+			return nil, fmt.Errorf(ErrParseParamFmt, param.SKIP_VERIFICATION, b, skipVerification, err)
 		}
 		opts = append(opts, conn.OptionSkipVerification(b))
 	}
@@ -164,7 +181,7 @@ func makeConnConfigs(host string, urlValues url.Values, logf func(s string, i ..
 	if noDelay := urlValues.Get(param.NO_DELAY); noDelay != "" {
 		b, err := strconv.ParseBool(noDelay)
 		if err != nil {
-			return nil, errors.ErrorfWithCaller(ErrParsingParamFmt, b, noDelay, err)
+			return nil, fmt.Errorf(ErrParseParamFmt, b, noDelay, err)
 		}
 		opts = append(opts, conn.OptionNoDelay(b))
 	}
@@ -172,7 +189,7 @@ func makeConnConfigs(host string, urlValues url.Values, logf func(s string, i ..
 	if connTimeout := urlValues.Get(param.CONNECTION_TIMEOUT); connTimeout != "" {
 		duration, err := time.ParseDuration(connTimeout)
 		if err != nil {
-			return nil, errors.ErrorfWithCaller(ErrParsingParamFmt, duration, connTimeout, err)
+			return nil, fmt.Errorf(ErrParseParamFmt, param.CONNECTION_TIMEOUT, duration, connTimeout, err)
 		}
 		opts = append(opts, conn.OptionConnTimeout(duration))
 	} else {
@@ -182,7 +199,7 @@ func makeConnConfigs(host string, urlValues url.Values, logf func(s string, i ..
 	if readTimeout := urlValues.Get(param.READ_TIMEOUT); readTimeout != "" {
 		duration, err := time.ParseDuration(readTimeout)
 		if err != nil {
-			return nil, errors.ErrorfWithCaller(ErrParsingParamFmt, duration, readTimeout, err)
+			return nil, fmt.Errorf(ErrParseParamFmt, param.READ_TIMEOUT, duration, readTimeout, err)
 		}
 		opts = append(opts, conn.OptionReadTimeout(duration))
 	} else {
@@ -192,7 +209,7 @@ func makeConnConfigs(host string, urlValues url.Values, logf func(s string, i ..
 	if writeTimeout := urlValues.Get(param.WRITE_TIMEOUT); writeTimeout != "" {
 		duration, err := time.ParseDuration(writeTimeout)
 		if err != nil {
-			return nil, errors.ErrorfWithCaller(ErrParsingParamFmt, duration, writeTimeout, err)
+			return nil, fmt.Errorf(ErrParseParamFmt, param.WRITE_TIMEOUT, duration, writeTimeout, err)
 		}
 		opts = append(opts, conn.OptionWriteTimeout(duration))
 	} else {
@@ -202,18 +219,47 @@ func makeConnConfigs(host string, urlValues url.Values, logf func(s string, i ..
 	return conn.NewConnConfig(opts...)
 }
 
-func makeAuthentication(urlValues url.Values) *conn.Authentication {
+func makeAuthentication(urlValues url.Values) (conn.Authentication, error) {
+	accessKey := urlValues.Get(param.ACCESS_KEY)
+	region := strings.ToLower(urlValues.Get(param.REGION))
+
+	// Try using AK/SK authentication
+	if accessKey != "" {
+		secretKey := urlValues.Get(param.SECRET_KEY)
+		if secretKey == "" {
+			return nil, ErrDsnMissingSecretKey
+		}
+		if region == "" {
+			return nil, ErrDsnMissingRegion
+		}
+		return conn.NewSignatureAuthentication(accessKey, secretKey, region), nil
+	}
+
+	token := urlValues.Get(param.TOKEN)
+	if token != "" {
+		isSystemS := urlValues.Get(param.IS_SYSTEM)
+		if isSystemS != "" {
+			isSystem, err := parseBool(isSystemS)
+			if err != nil {
+				return nil, fmt.Errorf("expect bool for is_system")
+			}
+			if isSystem {
+				return conn.NewSystemAuthentication(token), nil
+			}
+		}
+		return nil, ErrTokenAuthNotSupported
+	}
+
 	username := urlValues.Get(param.USER)
+	account := urlValues.Get(param.ACCOUNT)
+	password := urlValues.Get(param.PASSWORD)
 	if username == "" {
 		username = "default"
 	}
-	accountID := urlValues.Get(param.ACCOUNT)
-	if accountID != "" {
-		username = fmt.Sprintf("%v::%v", accountID, username)
+	if account != "" {
+		username = fmt.Sprintf("%v::%v", account, username)
 	}
-	password := urlValues.Get(param.PASSWORD)
-	token := urlValues.Get(param.TOKEN)
-	return conn.NewAuthentication(token, username, password)
+	return conn.NewPasswordAuthentication(username, password), nil
 }
 
 func parseBool(s string) (bool, error) {

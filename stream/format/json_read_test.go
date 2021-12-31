@@ -19,13 +19,13 @@ func TestJSONBlockStreamFmtReader_BlockStreamFmtRead(t *testing.T) {
 		NumRows:    0,
 		Columns: []*column.CHColumn{
 			{
-				Name:           "'a'",
+				Name:           "a",
 				Type:           "Int32",
 				Data:           column.MustMakeColumnData(column.INT32, 0),
 				GenerateColumn: column.MustGenerateColumnDataFactory(column.INT32),
 			},
 			{
-				Name:           "'b'",
+				Name:           "b",
 				Type:           "Int32",
 				Data:           column.MustMakeColumnData(column.INT32, 0),
 				GenerateColumn: column.MustGenerateColumnDataFactory(column.INT32),
@@ -37,13 +37,13 @@ func TestJSONBlockStreamFmtReader_BlockStreamFmtRead(t *testing.T) {
 		NumRows:    0,
 		Columns: []*column.CHColumn{
 			{
-				Name:           "'a'",
+				Name:           "a",
 				Type:           "String",
 				Data:           column.MustMakeColumnData(column.STRING, 0),
 				GenerateColumn: column.MustGenerateColumnDataFactory(column.STRING),
 			},
 			{
-				Name:           "'b'",
+				Name:           "b",
 				Type:           "String",
 				Data:           column.MustMakeColumnData(column.STRING, 0),
 				GenerateColumn: column.MustGenerateColumnDataFactory(column.STRING),
@@ -179,7 +179,7 @@ func TestJSONBlockStreamFmtReader_BlockStreamFmtRead(t *testing.T) {
 			wantRowsRead:   2,
 		},
 		{
-			name: "Can read json batch into block streams",
+			name: "Should throw error if column name given but not values",
 			blockStreamReader: func() BlockStreamFmtReader {
 				b, _ := BlockStreamFmtReaderFactory(Formats[JSON], bytes.NewReader([]byte(`{"data": [{ "a": 1, "b": 2 }, { "a": 1, "b"`)), emptySettings)
 				return b
@@ -189,8 +189,7 @@ func TestJSONBlockStreamFmtReader_BlockStreamFmtRead(t *testing.T) {
 				sample:    stringSample,
 				blockSize: 1,
 			},
-			wantBlocksRead: 1,
-			wantRowsRead:   1,
+			wantErr: true,
 		},
 		{
 			name: "Can read empty json into block streams",
@@ -235,12 +234,12 @@ func TestJSONBlockStreamFmtReader_BlockStreamFmtRead(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			blockStream := tt.blockStreamReader.BlockStreamFmtRead(tt.args.ctx, tt.args.sample, tt.args.blockSize)
+			blockStream, yield := tt.blockStreamReader.BlockStreamFmtRead(tt.args.ctx, tt.args.sample, tt.args.blockSize)
 			var nBlocks int
 			for range blockStream {
 				nBlocks++
 			}
-			nRows, err := tt.blockStreamReader.Yield()
+			nRows, err := yield()
 			if tt.wantErr {
 				require.Error(t, err)
 				return

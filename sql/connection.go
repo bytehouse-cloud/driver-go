@@ -1,13 +1,16 @@
 package sql
 
 import (
+	"bytes"
 	"context"
 	"database/sql"
 	"database/sql/driver"
 	"errors"
+	"fmt"
 	"net"
 	"reflect"
 	"time"
+	"unsafe"
 
 	"github.com/google/uuid"
 
@@ -39,7 +42,7 @@ func (c *CHConn) Rollback() error {
 // if the connection has been used before. If the driver returns ErrBadConn
 // the connection is discarded.
 func (c *CHConn) ResetSession(ctx context.Context) error {
-	if c.Gateway.Closed() {
+	if c.Gateway.Conn.InQueryingState() {
 		return driver.ErrBadConn
 	}
 
@@ -54,7 +57,7 @@ func (c *CHConn) ResetSession(ctx context.Context) error {
 // If CHConn.Ping returns ErrBadConn, DB.Ping and DB.PingContext will remove
 // the CHConn from pool.
 func (c *CHConn) Ping(ctx context.Context) error {
-	if c.Gateway.Closed() {
+	if c.Gateway.Conn.InQueryingState() {
 		return driver.ErrBadConn
 	}
 
@@ -72,7 +75,12 @@ func (c *CHConn) PrepareContext(ctx context.Context, query string) (driver.Stmt,
 		return newSelectStmt(numArgs, query, c), nil
 	}
 
-	insertStmt, err := c.Gateway.PrepareInsert(ctx, query, settings.DEFAULT_BLOCK_SIZE) // todo: make it customizable
+	insertQuery, err := utils.ParseInsertQuery(query)
+	if err != nil {
+		return nil, err
+	}
+
+	insertStmt, err := c.Gateway.PrepareInsert(ctx, insertQuery.Query, settings.DEFAULT_BLOCK_SIZE) // todo: make it customizable
 	if err != nil {
 		return nil, err
 	}
@@ -217,23 +225,27 @@ func (c *CHConn) query(ctx context.Context, query string, args []driver.Value) (
 		return connErr
 	}
 
-	// Prevent checking connection validity again, since ResetSession has alr check the connection validity
-	newCtx := sdk.ContextWithCheckedConn(ctx)
 	isInsertQuery := utils.IsInsert(query)
 
-	// If is insert query with arguments
-	if isInsertQuery && len(args) > 0 {
-		argsTable, err := getInsertArgsTable(query, args)
+	if isInsertQuery {
+		insertQuery, err := utils.ParseInsertQuery(query)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("failed to parse insert query: %s", err)
 		}
 
-		return emptyRows, c.Gateway.InsertWithArgs(newCtx, query, argsTable, settings.DEFAULT_BLOCK_SIZE)
-	}
+		// If is insert query with arguments
+		if len(args) > 0 {
+			iValues := *(*[]interface{})(unsafe.Pointer(&args))
+			return emptyRows, c.Gateway.InsertArgs(ctx, insertQuery.Query,
+				settings.DEFAULT_BLOCK_SIZE, iValues...,
+			)
+		}
 
-	// If is insert query with no arguments
-	if isInsertQuery {
-		qr, err := c.Gateway.QueryContext(ctx, query)
+		// Insert query with no arguments
+		qr, err := c.Gateway.InsertWithData(
+			ctx, insertQuery.Query, bytes.NewReader([]byte(insertQuery.Values)),
+			insertQuery.DataFmt, settings.DEFAULT_BLOCK_SIZE,
+		)
 		if err != nil {
 			return nil, handleBadConn(err)
 		}
@@ -251,7 +263,7 @@ func (c *CHConn) query(ctx context.Context, query string, args []driver.Value) (
 		return nil, err
 	}
 
-	qr, err := c.Gateway.QueryContext(newCtx, query)
+	qr, err := c.Gateway.QueryContext(ctx, query)
 	if err != nil {
 		return nil, handleBadConn(err)
 	}

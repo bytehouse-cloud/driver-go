@@ -1,6 +1,8 @@
 package response
 
 import (
+	"time"
+
 	"github.com/bytehouse-cloud/driver-go/driver/lib/ch_encoding"
 	"github.com/bytehouse-cloud/driver-go/driver/protocol"
 	"github.com/bytehouse-cloud/driver-go/errors"
@@ -15,6 +17,10 @@ type Packet interface {
 const unknownPacketType = "unknown packet type: %v"
 
 func ReadPacket(decoder *ch_encoding.Decoder, compress bool, revision uint64) (Packet, error) {
+	return ReadPacketWithLocation(decoder, compress, revision, nil)
+}
+
+func ReadPacketWithLocation(decoder *ch_encoding.Decoder, compress bool, revision uint64, location *time.Location) (Packet, error) {
 	packetType, err := decoder.Uvarint()
 	if err != nil {
 		return nil, err
@@ -23,7 +29,7 @@ func ReadPacket(decoder *ch_encoding.Decoder, compress bool, revision uint64) (P
 	case protocol.ServerHello:
 		return &HelloPacket{}, nil
 	case protocol.ServerData:
-		return readDataPacket(decoder, compress)
+		return readDataPacket(decoder, compress, location)
 	case protocol.ServerException:
 		return readExceptionPacket(decoder)
 	case protocol.ServerProgress:
@@ -35,13 +41,13 @@ func ReadPacket(decoder *ch_encoding.Decoder, compress bool, revision uint64) (P
 	case protocol.ServerProfileInfo:
 		return readProfilePacket(decoder)
 	case protocol.ServerTotals:
-		return readTotalsPacket(decoder, compress)
+		return readTotalsPacket(decoder, compress, location)
 	case protocol.ServerExtremes:
-		return readExtremesPacket(decoder, compress)
+		return readExtremesPacket(decoder, compress, location)
 	case protocol.ServerTablesStatus:
 		return readTableStatusPacket(decoder)
 	case protocol.ServerLog:
-		return readLogPacket(decoder)
+		return readLogPacket(decoder, location)
 	case protocol.ServerTableColumns:
 		return readTableColumnsPacket(decoder)
 	case protocol.ServerQueryPlan:

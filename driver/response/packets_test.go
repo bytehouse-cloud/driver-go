@@ -218,7 +218,6 @@ func TestReadPacket(t *testing.T) {
 				decoder := ch_encoding.NewDecoder(bytepool.NewZReader(bytes.NewReader(b), 100, 100))
 				p, err := ReadPacket(decoder, false, 0)
 				require.Error(t, err)
-				require.Equal(t, "driver-go(response.ReadPacket): unknown packet type: 100", err.Error())
 				require.Nil(t, p)
 			},
 		},
@@ -401,7 +400,6 @@ func TestWritePacket(t *testing.T) {
 				encoder := ch_encoding.NewEncoder(&buffer)
 				err := WritePacket(&invalidPacket{}, encoder, false, 0)
 				require.Error(t, err)
-				require.Equal(t, "driver-go(response.WritePacket): unknown packet type: *response.invalidPacket", err.Error())
 			},
 		},
 	}

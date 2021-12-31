@@ -10,10 +10,8 @@ import (
 
 type QueryContext struct {
 	context.Context
-	querySettings     map[string]interface{}
-	bytehouseSettings map[string]interface{}
-	// Bool flag that tells you that the connection has been checked
-	hasCheckedConn bool
+	querySettings  map[string]interface{}
+	clientSettings map[string]interface{}
 }
 
 // NewQueryContext initialize a context that can be passed when querying.
@@ -29,9 +27,9 @@ func NewQueryContext(ctx context.Context) *QueryContext {
 		return qc
 	}
 	return &QueryContext{
-		Context:           ctx,
-		querySettings:     make(map[string]interface{}),
-		bytehouseSettings: make(map[string]interface{}),
+		Context:        ctx,
+		querySettings:  make(map[string]interface{}),
+		clientSettings: make(map[string]interface{}),
 	}
 }
 
@@ -49,29 +47,21 @@ func (q *QueryContext) GetQuerySettings() map[string]interface{} {
 	return q.querySettings
 }
 
-// AddByteHouseSetting adds a settings which will not be send over to server
-func (q *QueryContext) AddByteHouseSetting(name string, value interface{}) error {
-	v, err := settingToValue(name, value)
+// AddClientSetting adds a settings which will not be send over to server
+func (q *QueryContext) AddClientSetting(name string, value interface{}) error {
+	v, err := clientSettingToValue(name, value)
 	if err != nil {
 		return err
 	}
-	q.bytehouseSettings[name] = v
+	q.clientSettings[name] = v
 	return nil
 }
 
-func (q *QueryContext) GetByteHouseSettings() map[string]interface{} {
-	return q.bytehouseSettings
+func (q *QueryContext) GetClientSettings() map[string]interface{} {
+	return q.clientSettings
 }
 
-func (q *QueryContext) GetCheckedConn() bool {
-	return q.hasCheckedConn
-}
-
-func (q *QueryContext) SetCheckedConn(checkedConn bool) {
-	q.hasCheckedConn = checkedConn
-}
-
-func settingToValue(name string, value interface{}) (interface{}, error) {
+func clientSettingToValue(name string, value interface{}) (interface{}, error) {
 	def, ok := Default[name]
 	if !ok {
 		return nil, fmt.Errorf("%v is not a bytehouse setting", name)

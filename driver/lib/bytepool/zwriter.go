@@ -104,7 +104,7 @@ func (z *ZWriter) WriteByte(b byte) error {
 }
 
 func (z *ZWriter) WriteString(s string) error {
-	_, err := z.Write(sixb.StB(s))
+	_, err := z.Write(sixb.StoB(s))
 	return err
 }
 

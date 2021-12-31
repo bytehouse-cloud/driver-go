@@ -2,7 +2,6 @@ package column
 
 import (
 	"bytes"
-	"fmt"
 	"testing"
 
 	"github.com/pkg/profile"
@@ -183,7 +182,6 @@ func TestArrayColumnData_ReadFromTexts(t *testing.T) {
 			i := MustMakeColumnData(tt.columnType, 1000)
 
 			got, err := i.ReadFromTexts(tt.args.texts)
-			fmt.Println(err)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("ReadFromTexts() error = %v, wantErr %v", err, tt.wantErr)
 				return

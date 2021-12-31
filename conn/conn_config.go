@@ -7,10 +7,20 @@ import (
 
 type logf func(string, ...interface{})
 
-var noLog logf = func(s string, i ...interface{}) {}
+var (
+	noLog          logf = func(s string, i ...interface{}) {}
+	tlsConfDefault      = &tls.Config{}
+)
 
 func NewConnConfig(opts ...OptionConfig) (*ConnConfig, error) {
-	newConnConfigs := &ConnConfig{logf: noLog}
+	newConnConfigs := &ConnConfig{
+		logf:         noLog,
+		tlsConfig:    tlsConfDefault,
+		connTimeout:  time.Second,
+		dialStrategy: DialRandom,
+		readTimeout:  time.Minute,
+		writeTimeout: time.Minute,
+	}
 
 	for _, opt := range opts {
 		if err := opt(newConnConfigs); err != nil {

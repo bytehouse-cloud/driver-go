@@ -19,13 +19,6 @@ import (
 	"github.com/bytehouse-cloud/driver-go/utils"
 )
 
-// -- UNIT TESTS -- //
-func TestCheckedConn(t *testing.T) {
-	require.False(t, HasCheckedConn(context.Background()))
-	ctxChecked := ContextWithCheckedConn(context.Background())
-	require.True(t, HasCheckedConn(ctxChecked))
-}
-
 // -- INTEGRATION TESTS -- //
 func getConfig(t *testing.T) *Config {
 	config, err := ParseDSN("tcp://localhost:9000?user=default", nil, nil)
@@ -39,13 +32,9 @@ func getConfig(t *testing.T) *Config {
 func TestSDKSimple(t *testing.T) {
 	utils.SkipIntegrationTestIfShort(t)
 
-	gateway, err := OpenConfig(getConfig(t))
-	if err != nil {
-		fmt.Println(err)
-		t.FailNow()
-	}
+	gateway := OpenConfig(getConfig(t))
 
-	_, err = gateway.Query("set send_logs_level = 'trace'")
+	_, err := gateway.Query("set send_logs_level = 'trace'")
 	result, err := gateway.Query("select * from numbers(2) as x, numbers(2) as y")
 	if err != nil {
 		fmt.Println(err)
@@ -61,21 +50,17 @@ func TestSDKSimple(t *testing.T) {
 	}
 
 	serverMetas := result.GetAllMeta()
-	for _, meta := range serverMetas {
-		fmt.Println(meta.String())
-	}
+	require.True(t, len(serverMetas) > 0)
+	logs := result.GetAllLogs()
+	require.True(t, len(logs) > 0)
 }
 
 func TestSDKInsert(t *testing.T) {
 	utils.SkipIntegrationTestIfShort(t)
 
-	gateway, err := OpenConfig(getConfig(t))
-	if err != nil {
-		fmt.Println(err)
-		t.FailNow()
-	}
+	gateway := OpenConfig(getConfig(t))
 
-	_, err = gateway.Query("create database if not exists zx_test")
+	_, err := gateway.Query("create database if not exists zx_test")
 	_, err = gateway.Query("create table if not exists zx_test.number (f Int64) Engine = Log")
 	_, err = gateway.Query("truncate table zx_test.number")
 
@@ -113,13 +98,9 @@ func TestSDKInsert(t *testing.T) {
 func TestSDKCancel(t *testing.T) {
 	utils.SkipIntegrationTestIfShort(t)
 
-	gateway, err := OpenConfig(getConfig(t))
-	if err != nil {
-		fmt.Println(err)
-		t.FailNow()
-	}
+	gateway := OpenConfig(getConfig(t))
 
-	_, err = gateway.Query("set send_logs_level = 'trace'")
+	_, err := gateway.Query("set send_logs_level = 'trace'")
 	ctx, cancel := context.WithDeadline(context.Background(), time.Now().Add(time.Second))
 	defer cancel()
 	result, err := gateway.QueryContext(ctx, "select * from system.numbers limit 1000000000")
@@ -137,26 +118,16 @@ func TestSDKCancel(t *testing.T) {
 		cntRow++
 	}
 
-	fmt.Printf("number of rows: %v\n", cntRow)
 	require.NotEqual(t, cntRow, 1000000000)
-
-	serverMetas := result.GetAllMeta()
-	for _, meta := range serverMetas {
-		fmt.Println(meta.String())
-	}
 }
 
 func TestSDKQueryWithSetting(t *testing.T) {
 	utils.SkipIntegrationTestIfShort(t)
 
-	gateway, err := OpenConfig(getConfig(t))
-	if err != nil {
-		fmt.Println(err)
-		t.FailNow()
-	}
+	gateway := OpenConfig(getConfig(t))
 
 	ctx := bytehouse.NewQueryContext(context.Background())
-	err = ctx.AddQuerySetting("send_logs_level", "trace")
+	err := ctx.AddQuerySetting("send_logs_level", "trace")
 	if err != nil {
 		fmt.Println(err)
 		t.FailNow()
@@ -174,21 +145,12 @@ func TestSDKQueryWithSetting(t *testing.T) {
 		}
 		fmt.Println(row)
 	}
-
-	serverMetas := result.GetAllMeta()
-	for _, meta := range serverMetas {
-		fmt.Println(meta.String())
-	}
 }
 
 func TestQueryResult_ExportToReader(t *testing.T) {
 	utils.SkipIntegrationTestIfShort(t)
 
-	gateway, err := OpenConfig(getConfig(t))
-	if err != nil {
-		fmt.Println(err)
-		t.FailNow()
-	}
+	gateway := OpenConfig(getConfig(t))
 	if err := gateway.Ping(); err != nil {
 		fmt.Println(err)
 		t.FailNow()
@@ -825,14 +787,14 @@ func TestGateway_Insert(t *testing.T) {
 			wantErr:     false,
 		},
 	}
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// Setup table script
-			g, err := OpenConfig(getConfig(t))
-			require.NoError(t, err)
+			g := OpenConfig(getConfig(t))
 			require.NotNil(t, g)
 
-			_, err = g.QueryContext(tt.args.ctx, utils.AllowMapSQLScript)
+			_, err := g.QueryContext(tt.args.ctx, utils.AllowMapSQLScript)
 			require.NoError(t, err)
 
 			err = g.Ping()
@@ -853,18 +815,13 @@ func TestGateway_Insert(t *testing.T) {
 			requireQrNoError(t, qr, err)
 			_ = qr.Close()
 
-			fmt.Println("start insert")
-			err = g.InsertWithArgs(tt.args.ctx, tt.args.query, tt.args.args, settings.DEFAULT_BLOCK_SIZE)
-			fmt.Println(err)
+			err = g.InsertTable(tt.args.ctx, tt.args.query, tt.args.args, settings.DEFAULT_BLOCK_SIZE)
 			if !tt.wantErr {
 				require.NoError(t, err)
 			}
-			fmt.Println("end insert")
 
-			fmt.Println("start query")
 			qr, err = g.QueryContext(tt.args.ctx, tt.selectQuery)
 			requireQrNoError(t, qr, err)
-			fmt.Println("end query")
 			i := 0
 			for {
 				rowValues, ok := qr.NextRow()
@@ -961,8 +918,7 @@ func TestGateway_InsertWithDataReader(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// Setup table script
-			g, err := OpenConfig(getConfig(t))
-			require.NoError(t, err)
+			g := OpenConfig(getConfig(t))
 
 			qr, err := g.Query(tt.teardownQuery)
 			require.NoError(t, err)
@@ -1080,11 +1036,10 @@ func TestGateway_Query(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			gateway, err := OpenConfig(getConfig(t))
-			require.NoError(t, err)
+			gateway := OpenConfig(getConfig(t))
 			require.NotNil(t, gateway)
 
-			err = gateway.Ping()
+			err := gateway.Ping()
 			require.NoError(t, err)
 			defer gateway.Close()
 

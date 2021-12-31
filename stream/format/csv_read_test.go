@@ -225,12 +225,12 @@ func TestCSVBlockStreamFmtReader_BlockStreamFmtRead(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			blockStream := tt.blockStreamReader.BlockStreamFmtRead(tt.args.ctx, tt.args.sample, tt.args.blockSize)
+			blockStream, yield := tt.blockStreamReader.BlockStreamFmtRead(tt.args.ctx, tt.args.sample, tt.args.blockSize)
 			var nBlocks int
 			for range blockStream {
 				nBlocks++
 			}
-			nRows, err := tt.blockStreamReader.Yield()
+			nRows, err := yield()
 			if tt.wantErr {
 				require.Error(t, err)
 				return
@@ -311,8 +311,8 @@ func TestCSVBlockStreamFmtReader_ArrayRead(t *testing.T) {
 [baz], [7,8,9]`))
 	r, err := NewCSVBlockStreamFmtReader(input, false, nil)
 	require.NoError(t, err)
-	blockStream := r.BlockStreamFmtRead(context.Background(), arrBlock, 5)
-	_, err = r.Yield()
+	blockStream, yield := r.BlockStreamFmtRead(context.Background(), arrBlock, 5)
+	_, err = yield()
 	require.NoError(t, err)
 
 	var output bytes.Buffer
