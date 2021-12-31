@@ -1,0 +1,9 @@
+.idea/
+.notes/
+.DS_STORE
+.DS_Store
+coverage.txt
+coverage/
+*.pprof
+trace.out
+*temp.*
