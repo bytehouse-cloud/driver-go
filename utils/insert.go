@@ -32,24 +32,6 @@ type InsertQuery struct {
 	Values  string
 }
 
-// ColumnsCount get number of question marks in a row
-// Assumption: No nested brackets
-// Returns error if invalid values format
-// E.g. (?, ?, ?), (?, ?, ?) -> 3
-func (iq *InsertQuery) ColumnsCount() (int, error) {
-	var questionMarkCount int
-	for _, v := range iq.Values {
-		if v == '?' {
-			questionMarkCount += 1
-			continue
-		}
-		if v == ')' {
-			return questionMarkCount, nil
-		}
-	}
-	return 0, errors.ErrorfWithCaller("invalid query values format = %s", iq.Values)
-}
-
 var (
 	splitInsertRe = regexp.MustCompile(fmt.Sprintf(`(?i)\s+%s|%s|%s|%s\s*`,
 		format.Formats[format.CSVWITHNAMES],

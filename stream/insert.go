@@ -24,15 +24,15 @@ func HandleInsertFromFmtStream(
 		return 0, err
 	}
 
+	eg, ctx := errgroup.WithContext(ctx)
 	insertProcess := NewInsertProcess(sample, sendBlock, cancelInsert, opts...)
-	blockInputStream := blockReader.BlockStreamFmtRead(ctx, sample, insertProcess.BatchSize())
+	blockInputStream, yield := blockReader.BlockStreamFmtRead(ctx, sample, insertProcess.BatchSize())
 	insertProcess.Start(ctx, blockInputStream, respStream)
 
-	var eg errgroup.Group
 	var rowsRead, rowsSent int
 	var readErr, insertErr error
 	eg.Go(func() error {
-		rowsRead, readErr = blockReader.Yield()
+		rowsRead, readErr = yield()
 		return readErr
 	})
 	eg.Go(func() error {

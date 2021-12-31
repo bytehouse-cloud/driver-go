@@ -44,7 +44,7 @@ func (c *CSVBlockStreamFmtWriter) blockStreamFmtWrite(blockStream <-chan *data.B
 	defer func() {
 		c.done <- struct{}{}
 	}()
-	c.totalRowsWrite, c.exception = helper.WriteBlockSteamToFrame(blockStream, c)
+	c.totalRowsWrite, c.exception = helper.WriteTableFromBlockStream(blockStream, c)
 }
 
 func (c *CSVBlockStreamFmtWriter) Yield() (int, error) {
@@ -61,7 +61,7 @@ func (c *CSVBlockStreamFmtWriter) WriteFirstFrame(frame [][]string, cols []*colu
 		if err := c.zWriter.WriteString(cols[0].Name); err != nil {
 			return 0, err
 		}
-		for i := range cols {
+		for i := 1; i < len(cols); i++ {
 			if err := c.zWriter.WriteByte(c.delimiterBytes); err != nil {
 				return 0, err
 			}
@@ -156,6 +156,6 @@ func (c *CSVBlockStreamFmtWriter) writeColumnWithCheck(s string) error {
 }
 
 func (c *CSVBlockStreamFmtWriter) writeString(s string) error {
-	_, err := c.zWriter.Write(sixb.StB(s))
+	_, err := c.zWriter.Write(sixb.StoB(s))
 	return err
 }

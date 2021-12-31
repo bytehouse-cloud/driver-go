@@ -20,8 +20,8 @@ type tableEndWriter interface {
 	WriteEnd() error
 }
 
-func WriteBlockSteamToFrame(blockStream <-chan *data.Block, tWriter TableWriter) (int, error) {
-	frameStream, cols, recycleFrame, ok := asyncBlockToFrame(blockStream)
+func WriteTableFromBlockStream(blockStream <-chan *data.Block, tWriter TableWriter) (int, error) {
+	frameStream, cols, recycleFrame, ok := BlockToFrame(blockStream)
 	if !ok {
 		return 0, nil
 	}

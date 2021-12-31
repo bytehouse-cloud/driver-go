@@ -3,44 +3,21 @@ package format
 import (
 	"bytes"
 	"context"
+	"fmt"
 	"io"
 	"strings"
 
 	"github.com/bytehouse-cloud/driver-go/driver/lib/bytepool"
 	"github.com/bytehouse-cloud/driver-go/driver/lib/data"
 	"github.com/bytehouse-cloud/driver-go/driver/lib/data/column"
-	"github.com/bytehouse-cloud/driver-go/errors"
 	"github.com/bytehouse-cloud/driver-go/stream/format/helper"
 )
 
+//TODO: add option to be able to read \uXXXX as an escaped character
+
 type JSONBlockStreamFmtReader struct {
-	zReader *bytepool.ZReader
-
-	totalRowsRead int
-	exception     error
-	done          chan struct{}
-	mapColNameIdx map[string]int
-}
-
-func (j *JSONBlockStreamFmtReader) ReadFirstRow(colTexts [][]string, cols []*column.CHColumn) error {
-	return j.readRow(colTexts, 0, cols)
-}
-
-func (j *JSONBlockStreamFmtReader) ReadRowCont(colTexts [][]string, rowIdx int, cols []*column.CHColumn) error {
-	j.readOptionalComma()
-	return j.readRow(colTexts, rowIdx, cols)
-}
-
-func (j *JSONBlockStreamFmtReader) ReadFirstColumnTexts(colTexts [][]string, cols []*column.CHColumn) (int, error) {
-	if err := j.skipMeta(); err != nil {
-		return 0, err
-	}
-	j.mapNameIdx(cols)
-	return helper.ReadFirstColumnTexts(colTexts, cols, j)
-}
-
-func (j *JSONBlockStreamFmtReader) ReadColumnTextsCont(colTexts [][]string, cols []*column.CHColumn) (int, error) {
-	return helper.ReadColumnTextsCont(colTexts, cols, j)
+	zReader      *bytepool.ZReader
+	colIdxByName map[string]int
 }
 
 func NewJSONBlockStreamFmtReader(r io.Reader) *JSONBlockStreamFmtReader {
@@ -49,247 +26,211 @@ func NewJSONBlockStreamFmtReader(r io.Reader) *JSONBlockStreamFmtReader {
 	}
 }
 
-func (j *JSONBlockStreamFmtReader) BlockStreamFmtRead(ctx context.Context, sample *data.Block, blockSize int) <-chan *data.Block {
-	j.done = make(chan struct{}, 1)
-	return helper.ReadColumnTextsToBlockStream(ctx, sample, blockSize, j, &j.exception, &j.totalRowsRead, func() {
-		j.done <- struct{}{}
-	})
-}
-
-func (j *JSONBlockStreamFmtReader) Yield() (int, error) {
-	<-j.done
-	return j.totalRowsRead, j.exception
-}
-
-// readRow reads a row of data
-// Expected row format: {col:val, col:val, col:val}
-func (j *JSONBlockStreamFmtReader) readRow(colTexts [][]string, rowIdx int, cols []*column.CHColumn) error {
-
-	// 1st check if encounter the closing square bracket, which denotes the end of data
-	err := j.checkOptionalSquareClosingBracket()
-	if err != nil {
-		return err
+func (j *JSONBlockStreamFmtReader) ReadFirstRow(fb *bytepool.FrameBuffer, cols []*column.CHColumn) (err error) {
+	//return j.readRow(fb, cols)
+	if err := j.readRow(fb, cols); err != nil {
+		return fmt.Errorf("error in first row %s", err)
 	}
-
-	if err := j.readOpenCurlyBracket(); err != nil {
-		return err
-	}
-
-	// Read first n - 1 columns
-	for i := 0; i < len(colTexts)-1; i++ {
-		colName, err := j.readElem(cols[i], false)
-		if err != nil {
-			return err
-		}
-		if err := j.readColon(); err != nil {
-			return err
-		}
-		colValue, err := j.readElem(cols[i], false)
-		colIdx := j.mapColNameIdx[colName]
-		if err != nil {
-			if i > 0 && err != io.EOF { //if not reading first row and EOF
-				return errors.ErrorfWithCaller(readElemErr, cols[colIdx].Type, cols[colIdx].Name, colIdx, err)
-			}
-			return err
-		}
-		colTexts[colIdx][rowIdx] = colValue
-
-		if err := j.readDelimiter(); err != nil {
-			return errors.ErrorfWithCaller("read delimiter error: %s", err)
-		}
-	}
-
-	// Read nth column
-	colName, err := j.readElem(cols[len(colTexts)-1], false)
-	if err != nil {
-		return err
-	}
-	if err := j.readColon(); err != nil {
-		return err
-	}
-	colValue, err := j.readElem(cols[len(colTexts)-1], true)
-	colIdx := j.mapColNameIdx[colName]
-
-	if err != nil && err != io.EOF { // last col permitted to be nothing
-		return errors.ErrorfWithCaller(readElemErr, cols[colIdx].Type, colName, colIdx, err)
-	}
-	colTexts[colIdx][rowIdx] = colValue
-
-	if err := j.readCloseCurlyBracket(); err != nil {
-		return errors.ErrorfWithCaller("error reading close curly bracket: %s", err)
-	}
-
-	j.readOptionalComma()
-
 	return nil
 }
 
-func (j *JSONBlockStreamFmtReader) readElem(col *column.CHColumn, last bool) (string, error) {
-	var (
-		b   byte
-		err error
-	)
-
-	b, err = helper.ReadNextNonSpaceByte(j.zReader)
-
-	if err != nil {
-		return "", err
-	}
-
-	var quoted bool
-	if b == '"' {
-		quoted = true
-	}
-
-	if quoted {
-		return j.readElemUntilQuote(b, col)
-	}
-
-	j.zReader.UnreadCurrentBuffer(1)
-	return j.readElemWithoutQuote(col, last)
-}
-
-// readElemUntilQuote notFirstRow from underlying reader until quote is found, return the string notFirstRow excluding quote
-func (j *JSONBlockStreamFmtReader) readElemUntilQuote(quote byte, col *column.CHColumn) (string, error) {
-	switch col.Data.(type) {
-	case *column.FixedStringColumnData, *column.StringColumnData:
-		return j.readStringUntilQuote(quote)
-	}
-
-	return helper.ReadStringUntilByte(j.zReader, quote)
-}
-
-func (j *JSONBlockStreamFmtReader) readDelimiter() error {
+func (j *JSONBlockStreamFmtReader) ReadRowCont(fb *bytepool.FrameBuffer, cols []*column.CHColumn) error {
 	b, err := helper.ReadNextNonSpaceByte(j.zReader)
 	if err != nil {
 		return err
 	}
 
-	if b != ',' {
-		return errors.ErrorfWithCaller(expectedByteButGot, ',', b)
+	switch b {
+	case ',':
+		return j.readRow(fb, cols)
+	case ']': // end of more data, rest of data are not insert values
+		helper.FlushZReader(j.zReader)
+		return io.EOF
+	default:
+		return fmt.Errorf("json: read row error: expect: ',' or ']', got: %q", b)
+	}
+}
+
+// readRow reads a row of data
+// Expected row format: {col:val, col:val, col:val}
+func (j *JSONBlockStreamFmtReader) readRow(fb *bytepool.FrameBuffer, cols []*column.CHColumn) error {
+	if err := helper.AssertNextByteEqual(j.zReader, '{'); err != nil {
+		return err
 	}
 
-	return nil
+	// store the order of columns read
+	order := make([]int, len(cols))
+	sb := bytepool.NewStringsBuffer()
+
+	for i := range cols {
+		if i > 0 {
+			if err := helper.AssertNextByteEqual(j.zReader, ','); err != nil {
+				return err
+			}
+		}
+
+		columnName, err := j.readColumnName()
+		if err != nil {
+			return fmt.Errorf("error reading column name at idx %v: %s", i, err)
+		}
+
+		colIdx, ok := j.colIdxByName[columnName]
+		if !ok {
+			return fmt.Errorf("key error at idx %v, no key found for: %v", i, columnName)
+		}
+		order[i] = colIdx
+
+		if err := helper.AssertNextByteEqual(j.zReader, ':'); err != nil {
+			return fmt.Errorf("read colon error at idx %v: %s", i, err)
+		}
+
+		sb.NewElem()
+		if err := j.readElem(sb, cols[colIdx], i == len(cols)-1); err != nil {
+			return fmt.Errorf(errReadElem, cols[colIdx].Type, cols[colIdx].Name, i, err)
+		}
+	}
+
+	// get results (order based on user)
+	unordered_result := make([]string, len(cols))
+	sb.ExportTo(unordered_result)
+
+	// order based on sample data block from server
+	result := make([]string, len(cols))
+	for _, i := range order {
+		result[i] = unordered_result[order[i]]
+	}
+
+	for _, s := range result {
+		fb.NewElem()
+		fb.WriteString(s)
+	}
+
+	return helper.AssertNextByteEqual(j.zReader, '}')
+}
+
+func (j *JSONBlockStreamFmtReader) readElem(w helper.Writer, col *column.CHColumn, last bool) error {
+	if err := helper.AssertNextByteEqual(j.zReader, '"'); err != nil {
+		if err == io.EOF {
+			return io.EOF
+		}
+
+		j.zReader.UnreadCurrentBuffer(1)
+		return j.readElemUnquoted(w, col, last)
+	}
+
+	_, err := helper.ReadStringUntilByte(w, j.zReader, '"')
+	return err
+}
+
+func (j *JSONBlockStreamFmtReader) readElemUnquoted(w helper.Writer, col *column.CHColumn, last bool) error {
+	if last {
+		return helper.ReadCHElemTillStop(w, j.zReader, col, '}')
+	}
+	return helper.ReadCHElemTillStop(w, j.zReader, col, ',')
+}
+
+func (j *JSONBlockStreamFmtReader) ReadFirstColumnTexts(fb *bytepool.FrameBuffer, numRows int, cols []*column.CHColumn) (int, error) {
+	if err := j.skipMeta(); err != nil {
+		return 0, err
+	}
+	j.mapNameIdx(cols)
+	return helper.ReadFirstColumnTexts(fb, numRows, cols, j)
+}
+
+func (j *JSONBlockStreamFmtReader) ReadColumnTextsCont(fb *bytepool.FrameBuffer, numRows int, cols []*column.CHColumn) (int, error) {
+	return helper.ReadColumnTextsCont(fb, numRows, cols, j)
+}
+
+func (j *JSONBlockStreamFmtReader) BlockStreamFmtRead(ctx context.Context, sample *data.Block, blockSize int,
+) (blockStream <-chan *data.Block, yield func() (int, error)) {
+	return helper.TableToBlockStream(ctx, sample, blockSize, j)
+}
+
+func (j *JSONBlockStreamFmtReader) readColumnName() (string, error) {
+	if err := helper.AssertNextByteEqual(j.zReader, '"'); err != nil {
+		return "", err
+	}
+
+	var sb strings.Builder
+	if _, err := helper.ReadStringUntilByte(&sb, j.zReader, '"'); err != nil {
+		return "", err
+	}
+
+	return sb.String(), nil
 }
 
 // readStringUntilQuoteCont assumes that the previous columnTextsPool has no quote desired
-func (j *JSONBlockStreamFmtReader) readStringUntilQuoteCont(builder *strings.Builder, quote byte) (string, error) {
+func (j *JSONBlockStreamFmtReader) readStringUntilQuoteCont(fb *bytepool.FrameBuffer, quote byte) error {
 	buf, err := j.zReader.ReadNextBuffer()
 	if err != nil {
-		return "", err
+		return err
 	}
 
 	i := bytes.IndexByte(buf, quote)
 	if i < 0 {
-		builder.Write(buf)
-		return j.readStringUntilQuoteCont(builder, quote)
+		fb.Write(buf)
+		return j.readStringUntilQuoteCont(fb, quote)
 	}
 
 	if i == len(buf)-1 {
-		builder.Write(buf[:i])
-		return j.readStringQuotedCheck(builder, quote)
+		fb.Write(buf[:i])
+		return j.readStringQuotedCheck(fb, quote)
 	}
 
-	return j.readStringQuoteIndexed(builder, buf, i, quote)
+	return j.readStringQuoteIndexed(fb, buf, i, quote)
 }
 
 // readStringQuotedCheck assumes that the last byte of last columnTextsPool contains the end quote,
 // hence need to check the next columnTextsPool if the quote is actually escaped.
-func (j *JSONBlockStreamFmtReader) readStringQuotedCheck(builder *strings.Builder, quote byte) (string, error) {
+func (j *JSONBlockStreamFmtReader) readStringQuotedCheck(fb *bytepool.FrameBuffer, quote byte) error {
 	buf, err := j.zReader.ReadNextBuffer()
 	if err != nil {
-		return "", err
+		return err
 	}
 
 	if buf[0] == quote {
-		builder.WriteByte(buf[0])
+		fb.WriteByte(buf[0])
 		j.zReader.UnreadCurrentBuffer(len(buf) - 1)
-		return j.readStringUntilQuoteCont(builder, quote)
+		return j.readStringUntilQuoteCont(fb, quote)
 	}
 
 	j.zReader.UnreadCurrentBuffer(len(buf))
-	return builder.String(), nil
+	return nil
 }
 
 // readStringQuoteIndexed assumes that current buffer from zReader contain the quote at i index,
 // and i is not the last index of current columnTextsPool
-func (j *JSONBlockStreamFmtReader) readStringQuoteIndexed(builder *strings.Builder, buf []byte, i int, quote byte) (string, error) {
+func (j *JSONBlockStreamFmtReader) readStringQuoteIndexed(fb *bytepool.FrameBuffer, buf []byte, i int, quote byte) error {
 	if buf[i+1] == quote { // current quote at index i is escaped
-		builder.Write(buf[:i+1]) // append everything until including quote
+		fb.Write(buf[:i+1]) // append everything until including quote
 		j.zReader.UnreadCurrentBuffer(len(buf) - i - 2)
-		return j.readStringUntilQuoteCont(builder, quote)
+		return j.readStringUntilQuoteCont(fb, quote)
 	}
 
-	builder.Write(buf[:i])
+	fb.Write(buf[:i])
 	j.zReader.UnreadCurrentBuffer(len(buf) - i - 1)
-	return builder.String(), nil
+	return nil
 }
 
-// readElemWithoutQuote notFirstRow from columnTextsPool until Delimiter or newline is reached
-func (j *JSONBlockStreamFmtReader) readElemWithoutQuote(col *column.CHColumn, last bool) (string, error) {
-	if last {
-		return j.readLastElemWithoutQuote()
-	}
-
-	return helper.ReadCHElem(j.zReader, col, ',')
-}
-
-func (j *JSONBlockStreamFmtReader) readLastElemWithoutQuote() (string, error) {
-	s, err := helper.ReadStringUntilByte(j.zReader, '}')
-	switch err {
-	case nil:
-		j.zReader.UnreadCurrentBuffer(1)
-		return s, nil
-	case io.EOF:
-		return s, nil
-	default:
-		return s, err
-	}
-}
-
-func (j *JSONBlockStreamFmtReader) readStringUntilQuote(quote byte) (string, error) {
-	var builder strings.Builder
-
+func (j *JSONBlockStreamFmtReader) readStringUntilQuote(fb *bytepool.FrameBuffer, quote byte) error {
 	buf, err := j.zReader.ReadNextBuffer()
 	if err != nil {
-		return "", err
+		return err
 	}
 
 	i := bytes.IndexByte(buf, quote)
 
 	if i < 0 { // quote byte does not appear in buf
-		builder.Write(buf)
-		return j.readStringUntilQuoteCont(&builder, quote)
+		fb.Write(buf)
+		return j.readStringUntilQuoteCont(fb, quote)
 	}
 
 	if i == len(buf)-1 { // edge case where the quote byte is at the last index of buf
-		builder.Write(buf[:len(buf)-1])
-		return j.readStringQuotedCheck(&builder, quote)
+		fb.Write(buf[:len(buf)-1])
+		return j.readStringQuotedCheck(fb, quote)
 	}
 
-	return j.readStringQuoteIndexed(&builder, buf, i, quote)
-}
-
-func (j *JSONBlockStreamFmtReader) readOpenCurlyBracket() error {
-	b, err := helper.ReadNextNonSpaceByte(j.zReader)
-	if err != nil {
-		return err
-	}
-	if b != '{' {
-		return errors.ErrorfWithCaller(expectedByteButGot, '{', b)
-	}
-	return nil
-}
-
-func (j *JSONBlockStreamFmtReader) readCloseCurlyBracket() error {
-	b, err := helper.ReadNextNonSpaceByte(j.zReader)
-	if err != nil {
-		return err
-	}
-	if b != '}' {
-		return errors.ErrorfWithCaller(expectedByteButGot, '}', b)
-	}
-	return nil
+	return j.readStringQuoteIndexed(fb, buf, i, quote)
 }
 
 // skipMeta skips meta field of the json data until the first square bracket in the data field
@@ -335,31 +276,10 @@ func (j *JSONBlockStreamFmtReader) skipMeta() error {
 }
 
 func (j *JSONBlockStreamFmtReader) mapNameIdx(cols []*column.CHColumn) {
-	j.mapColNameIdx = make(map[string]int)
-	for i := range cols {
-		j.mapColNameIdx[cols[i].Name] = i
+	j.colIdxByName = make(map[string]int)
+	for i, col := range cols {
+		j.colIdxByName[col.Name] = i
 	}
-}
-
-func (j *JSONBlockStreamFmtReader) readOptionalComma() {
-	b, err := helper.ReadNextNonSpaceByte(j.zReader)
-	if err != nil {
-		return
-	}
-	if b != ',' {
-		j.zReader.UnreadCurrentBuffer(1)
-	}
-}
-
-func (j *JSONBlockStreamFmtReader) readColon() error {
-	b, err := helper.ReadNextNonSpaceByte(j.zReader)
-	if err != nil {
-		return err
-	}
-	if b != ':' {
-		return errors.ErrorfWithCaller(expectedByteButGot, ':', b)
-	}
-	return nil
 }
 
 func (j *JSONBlockStreamFmtReader) checkOptionalSquareClosingBracket() error {
@@ -371,11 +291,5 @@ func (j *JSONBlockStreamFmtReader) checkOptionalSquareClosingBracket() error {
 		j.zReader.UnreadCurrentBuffer(1)
 		return nil
 	}
-
-	// encountered ], then skip the rest of the stream
-	for {
-		if _, err := helper.ReadNextNonSpaceByte(j.zReader); err != nil {
-			return err
-		}
-	}
+	return io.EOF
 }

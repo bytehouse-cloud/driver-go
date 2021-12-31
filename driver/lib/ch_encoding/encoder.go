@@ -64,7 +64,7 @@ func (enc *Encoder) String(s string) error {
 	if err := enc.Uvarint(uint64(len(s))); err != nil {
 		return err
 	}
-	if _, err := enc.GetOutput().Write(sixb.StB(s)); err != nil {
+	if _, err := enc.GetOutput().Write(sixb.StoB(s)); err != nil {
 		return err
 	}
 	return nil

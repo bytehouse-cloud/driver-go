@@ -16,7 +16,7 @@ func WriteCHElemString(w io.Writer, s string, col *column.CHColumn) error {
 	case *column.DateColumnData, *column.DateTimeColumnData, *column.DateTime64ColumnData:
 		return writeStringWithDoubleQuote(w, s)
 	default:
-		_, err := w.Write(sixb.StB(s))
+		_, err := w.Write(sixb.StoB(s))
 		return err
 	}
 }
@@ -27,7 +27,7 @@ func writeStringWithDoubleQuoteEscaped(w io.Writer, s string) error {
 	}
 
 	for i := strings.IndexByte(s, doubleQuote); i >= 0; i = strings.IndexByte(s, doubleQuote) {
-		if _, err := w.Write(sixb.StB(s[:i])); err != nil {
+		if _, err := w.Write(sixb.StoB(s[:i])); err != nil {
 			return err
 		}
 		if _, err := w.Write(doubleQuoteEscapedBytes); err != nil {
@@ -35,7 +35,7 @@ func writeStringWithDoubleQuoteEscaped(w io.Writer, s string) error {
 		}
 		s = s[i+1:]
 	}
-	if _, err := w.Write(sixb.StB(s)); err != nil {
+	if _, err := w.Write(sixb.StoB(s)); err != nil {
 		return err
 	}
 
@@ -49,7 +49,7 @@ func writeStringWithDoubleQuote(w io.Writer, s string) error {
 	if _, err := w.Write(doubleQuoteBytes); err != nil {
 		return err
 	}
-	if _, err := w.Write(sixb.StB(s)); err != nil {
+	if _, err := w.Write(sixb.StoB(s)); err != nil {
 		return err
 	}
 	if _, err := w.Write(doubleQuoteBytes); err != nil {

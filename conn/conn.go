@@ -2,14 +2,14 @@ package conn
 
 import (
 	"bufio"
+	"context"
 	"fmt"
-	"time"
+	"strings"
 
 	"github.com/google/uuid"
 
 	"github.com/bytehouse-cloud/driver-go/driver/lib/ch_encoding"
 	"github.com/bytehouse-cloud/driver-go/driver/lib/data"
-	"github.com/bytehouse-cloud/driver-go/driver/lib/settings"
 	"github.com/bytehouse-cloud/driver-go/driver/protocol"
 	"github.com/bytehouse-cloud/driver-go/driver/response"
 	"github.com/bytehouse-cloud/driver-go/errors"
@@ -21,59 +21,55 @@ type GatewayConn struct {
 	writer      *bufio.Writer
 	encoder     *ch_encoding.Encoder
 	decoder     *ch_encoding.Decoder
-	compress    bool
+
+	compress  bool
+	connected bool
+	inQuery   bool
 
 	database       string
 	userInfo       *UserInfo
-	authentication *Authentication
+	authentication Authentication
 	serverInfo     *data.ServerInfo
 	settings       map[string]interface{}
 
 	logf func(string, ...interface{})
 
-	clone func() (*GatewayConn, error)
+	clone func() *GatewayConn
 }
 
 func NewGatewayConn(
 	connOptions *ConnConfig,
-	databaseName string,
-	authentication *Authentication,
+	database string,
+	authentication Authentication,
 	compress bool,
-	querySetting map[string]string,
-) (*GatewayConn, error) {
+	querySetting map[string]interface{},
+) *GatewayConn {
 	g := &GatewayConn{
 		connOptions:    connOptions,
 		compress:       compress,
 		userInfo:       NewUserInfo(),
 		authentication: authentication,
 		serverInfo:     &data.ServerInfo{},
-		settings:       make(map[string]interface{}),
-		database:       databaseName,
+		settings:       querySetting,
+		database:       database,
 	}
 
-	// set initial query settings
-	for k, v := range querySetting {
-		if err := g.AddSetting(k, v); err != nil {
-			return nil, err
-		}
+	g.clone = func() *GatewayConn {
+		return NewGatewayConn(g.connOptions, g.database, g.authentication, g.compress, g.settings)
+	}
+
+	return g
+}
+
+func (g *GatewayConn) forceConnect() error {
+	if g.connected {
+		return nil
 	}
 
 	if err := g.connect(); err != nil {
-		return nil, err
+		return err
 	}
-
-	g.clone = func() (*GatewayConn, error) {
-		newConn, err := NewGatewayConn(connOptions, databaseName, authentication, compress, querySetting)
-		if err != nil {
-			return nil, err
-		}
-		for k, v := range g.settings {
-			newConn.settings[k] = v
-		}
-		return newConn, nil
-	}
-
-	return g, nil
+	return g.verifySettings(g.settings)
 }
 
 func (g *GatewayConn) connect() error {
@@ -98,6 +94,7 @@ func (g *GatewayConn) connect() error {
 	if err := g.initialExchange(); err != nil {
 		return err
 	}
+	g.connected = true
 	return nil
 }
 
@@ -131,7 +128,7 @@ func (g *GatewayConn) sendHello() error {
 }
 
 func (g *GatewayConn) sendHelloProtocol() error {
-	return g.writeUvarint(protocol.ClientHello)
+	return g.authentication.WriteAuthProtocol(g.encoder)
 }
 
 func (g *GatewayConn) sendClientInfo() error {
@@ -139,7 +136,7 @@ func (g *GatewayConn) sendClientInfo() error {
 }
 
 func (g *GatewayConn) writeAuthentication() error {
-	return g.authentication.WriteToEncoder(g.encoder)
+	return g.authentication.WriteAuthData(g.encoder)
 }
 
 func (g *GatewayConn) receiveHello() error {
@@ -168,40 +165,50 @@ func (g *GatewayConn) receiveHello() error {
 	return nil
 }
 
-func (g *GatewayConn) CheckConnection() error {
+func (g *GatewayConn) CheckConnection() (err error) {
+	defer func() {
+		if err != nil {
+			g.connected = false
+		}
+	}()
+
+	if err := g.forceConnect(); err != nil {
+		return err
+	}
 	if err := g.writeUvarint(protocol.ClientPing); err != nil {
-		return NewErrBadConnection(fmt.Sprintf("(func: %s) writeUint64 error = %s", errors.GetFunctionName(g.CheckConnection), err))
+		return NewErrBadConnection(fmt.Sprintf("write uint64 error: %s", err))
 	}
 	if err := g.flush(); err != nil {
 		return err
 	}
 	u, err := g.readUvariant()
 	if err != nil {
-		return NewErrBadConnection(fmt.Sprintf("(func: %s) readUvariant error = %s", errors.GetFunctionName(g.CheckConnection), err))
+		return NewErrBadConnection(fmt.Sprintf("read uvarint error: %s", err))
 	}
 	if u != protocol.ServerPong {
-		_ = g.conn.Close()
-		return NewErrBadConnection(fmt.Sprintf("(func: %s) expected serverPong, received = %v", errors.GetFunctionName(g.CheckConnection), u))
+		return NewErrBadConnection(fmt.Sprintf("expected serverPong, got: %v", u))
 	}
 	return nil
 }
 
-// todo: add context and watch for cancellation
 func (g *GatewayConn) SendQuery(query string) error {
-	return g.SendQueryWithExternalTable(query, nil, "")
+	return g.SendQueryFull(query, "", nil, "")
 }
 
-func (g *GatewayConn) SendQueryWithExternalTable(query string, extTables <-chan *data.Block, extTableName string) error {
-	var err error
+func (g *GatewayConn) SendQueryFull(query, queryID string, extTables <-chan *data.Block, extTableName string) error {
+	err := g.forceConnect()
+	if err != nil {
+		return err
+	}
 	if err = g.writeUvarint(protocol.ClientQuery); err != nil {
 		return err
 	}
-	if err = g.sendQueryInfo(query); err != nil {
+	if err = g.sendQueryInfo(query, queryID); err != nil {
 		return err
 	}
 	if extTables != nil {
 		for t := range extTables {
-			if err = g.SendClientDataWithTableName(t, extTableName); err != nil {
+			if err = g.sendClientDataWithTableName(t, extTableName); err != nil {
 				return err
 			}
 		}
@@ -209,30 +216,39 @@ func (g *GatewayConn) SendQueryWithExternalTable(query string, extTables <-chan 
 	if err = g.SendClientData(&data.Block{}); err != nil {
 		return err
 	}
-	return g.flush()
+	if err = g.flush(); err != nil {
+		return err
+	}
+
+	g.inQuery = true
+	return nil
 }
 
-func (g *GatewayConn) sendQueryInfo(queryString string) error {
-	newUUID, err := uuid.NewRandom()
-	if err != nil {
-		return errors.ErrorfWithCaller("uuid new random error: %s", err)
+func (g *GatewayConn) sendQueryInfo(query, queryID string) error {
+	if queryID == "" {
+		newUUID, err := uuid.NewRandom()
+		if err != nil {
+			return fmt.Errorf("uuid random generation error: %s", err)
+		}
+		queryID = newUUID.String()
 	}
-	uuidString := newUUID.String()
+
 	compression := protocol.CompressDisable
 	if g.compress {
 		compression = protocol.CompressEnable
 	}
 
-	if err = g.writeString(uuidString); err != nil {
+	var err error
+	if err = g.writeString(queryID); err != nil {
 		return err
 	}
 	if err = g.writeUvarint(protocol.InitialQuery); err != nil {
 		return err
 	}
-	if err = g.writeString(g.authentication.username); err != nil {
+	if err = g.writeString(g.authentication.Identity()); err != nil {
 		return err
 	}
-	if err = g.writeString(uuidString); err != nil {
+	if err = g.writeString(queryID); err != nil {
 		return err
 	}
 	if err = g.writeString(g.conn.LocalAddr().String()); err != nil {
@@ -262,14 +278,7 @@ func (g *GatewayConn) sendQueryInfo(queryString string) error {
 	if err = g.writeUvarint(compression); err != nil {
 		return err
 	}
-	return g.writeString(queryString)
-}
-
-func (g *GatewayConn) sendUsernameOrToken() error {
-	if g.authentication.token != "" {
-		return g.writeString(g.authentication.token)
-	}
-	return g.writeString(g.authentication.username)
+	return g.writeString(query)
 }
 
 func (g *GatewayConn) sendUserInfo() error {
@@ -277,10 +286,10 @@ func (g *GatewayConn) sendUserInfo() error {
 }
 
 func (g *GatewayConn) SendClientData(block *data.Block) error {
-	return g.SendClientDataWithTableName(block, "")
+	return g.sendClientDataWithTableName(block, "")
 }
 
-func (g *GatewayConn) SendClientDataWithTableName(block *data.Block, tableName string) error {
+func (g *GatewayConn) sendClientDataWithTableName(block *data.Block, tableName string) error {
 	var err error
 	if err = g.writeUvarint(protocol.ClientData); err != nil {
 		return err
@@ -288,17 +297,25 @@ func (g *GatewayConn) SendClientDataWithTableName(block *data.Block, tableName s
 	if err = g.writeString(tableName); err != nil {
 		return err
 	}
+
+	//TODO: may be able to simplify without flush
 	if err = g.sendBlock(block); err != nil {
 		return err
 	}
 	return g.flush()
 }
 
-func (g *GatewayConn) SendCancel() error {
-	if err := g.writeUvarint(protocol.ClientCancel); err != nil {
-		return err
-	}
-	return g.flush()
+// Cancel cancels the current query and disconnects.
+// Non-blocking process
+func (g *GatewayConn) Cancel() {
+	go func() {
+		_ = g.writeUvarint(protocol.ClientCancel)
+		_ = g.flush()
+		_ = g.conn.Close()
+	}()
+
+	g.inQuery = false
+	g.connected = false
 }
 
 func (g *GatewayConn) sendBlock(block *data.Block) error {
@@ -311,7 +328,43 @@ func (g *GatewayConn) sendBlock(block *data.Block) error {
 }
 
 func (g *GatewayConn) Close() error {
+	if g.conn == nil {
+		return nil
+	}
 	return g.conn.Close()
+}
+
+func (g *GatewayConn) verifySingleSetting(name string, value interface{}) error {
+	var sb strings.Builder
+	sb.WriteString("SET ")
+	sb.WriteString(name)
+	sb.WriteString(" = ")
+	writeSettingValueFmt(&sb, value)
+	return g.SendQueryAssertNoError(context.Background(), sb.String())
+}
+
+// uerifySettings send set settings query to server to verify query settings
+func (g *GatewayConn) verifySettings(settings map[string]interface{}) error {
+	revert := g.remove_log_id()
+	defer revert()
+
+	if len(settings) == 0 {
+		return nil
+	}
+
+	var sb strings.Builder
+	sb.WriteString("SET ")
+
+	for k, v := range settings {
+		sb.WriteString(k)
+		sb.WriteString(" = ")
+		writeSettingValueFmt(&sb, v)
+		sb.WriteByte(',')
+	}
+
+	query := sb.String()
+	query = query[:len(query)-1] // to remove the last ','
+	return g.SendQueryAssertNoError(context.Background(), query)
 }
 
 func (g *GatewayConn) sendSettings() error {
@@ -350,19 +403,43 @@ func (g *GatewayConn) sendSettings() error {
 	return g.writeString("")
 }
 
+func (g *GatewayConn) AddSettingsTemporarily(temp map[string]interface{}) func() {
+	var toRemove []string
+	originalDelta := make(map[string]interface{})
+
+	for k, v := range temp {
+		originalValue, exists := g.settings[k]
+		if !exists {
+			toRemove = append(toRemove, k)
+		} else {
+			originalDelta[k] = originalValue
+		}
+
+		g.settings[k] = v
+	}
+
+	return func() {
+		for _, k := range toRemove {
+			delete(g.settings, k)
+		}
+		for k, v := range originalDelta {
+			g.settings[k] = v
+		}
+	}
+}
+
 func (g *GatewayConn) AddSetting(key string, value interface{}) error {
-	value, err := settings.SettingToValue(key, value)
-	if err != nil {
+	if err := g.verifySingleSetting(key, value); err != nil {
 		return err
 	}
 	g.settings[key] = value
 	return nil
 }
 
-// AddSettingsChecked assumes that the key and val passed are correct (key exist and val is of correct data type)
+// AddSettingChecked assumes that the key and val passed are correct (key exist and val is of correct data type)
 // and will not return error until query reaches the server.
 // callers are expected to handle the checking on their own.
-func (g *GatewayConn) AddSettingsChecked(key string, val interface{}) {
+func (g *GatewayConn) AddSettingChecked(key string, val interface{}) {
 	g.settings[key] = val
 }
 
@@ -402,7 +479,7 @@ func (g *GatewayConn) SetCurrentDatabase(database string) {
 
 // Closed returns true iff conn is closed
 func (g *GatewayConn) Closed() bool {
-	return g.conn.closed
+	return !g.connected || g.conn.closed
 }
 
 func (g *GatewayConn) GetAllSettings() map[string]interface{} {
@@ -410,12 +487,42 @@ func (g *GatewayConn) GetAllSettings() map[string]interface{} {
 }
 
 func (g *GatewayConn) flush() error {
-	if err := g.encoder.Flush(); err != nil {
-		return err
-	}
-	return g.conn.SetReadDeadline(time.Now().Add(g.connOptions.readTimeout))
+	return g.encoder.Flush()
 }
 
-func (g *GatewayConn) Clone() (*GatewayConn, error) {
+func (g *GatewayConn) Clone() *GatewayConn {
 	return g.clone()
+}
+
+func (g *GatewayConn) InQueryingState() bool {
+	return g.inQuery
+}
+
+func (g *GatewayConn) remove_log_id() func() {
+	log_id, ok := g.settings["log_id"]
+	if !ok {
+		return func() {}
+	}
+
+	delete(g.settings, "log_id")
+	return func() {
+		g.settings["log_id"] = log_id
+	}
+}
+
+func writeSettingValueFmt(sb *strings.Builder, v interface{}) {
+	switch v := v.(type) {
+	case string:
+		sb.WriteByte('\'')
+		sb.WriteString(v)
+		sb.WriteByte('\'')
+	case bool:
+		if v {
+			sb.WriteByte('1')
+			return
+		}
+		sb.WriteByte('0')
+	default:
+		sb.WriteString(fmt.Sprint(v))
+	}
 }

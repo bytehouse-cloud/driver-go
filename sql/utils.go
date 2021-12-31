@@ -12,7 +12,6 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/bytehouse-cloud/driver-go/errors"
-	"github.com/bytehouse-cloud/driver-go/utils"
 )
 
 // bindArgsToQuery binds query's question marks to args
@@ -144,33 +143,4 @@ func namedArgsToArgs(namedArgs []driver.NamedValue) ([]driver.Value, error) {
 		args[n] = param.Value
 	}
 	return args, nil
-}
-
-func getInsertArgsTable(query string, args []driver.Value) ([][]interface{}, error) {
-	iq, err := utils.ParseInsertQuery(query)
-	if err != nil {
-		return nil, err
-	}
-
-	columnsCount, err := iq.ColumnsCount()
-	if err != nil {
-		return nil, err
-	}
-
-	// If len args not divisible by columnsCount -> invalid number of args
-	if len(args)%columnsCount != 0 {
-		return nil, errors.ErrorfWithCaller("invalid args len, expected multiple of columns count = %d", columnsCount)
-	}
-
-	var argsIdx int // Current index of iterator through args array
-	out := make([][]interface{}, len(args)/columnsCount)
-	for i := range out {
-		out[i] = make([]interface{}, columnsCount)
-		for j := range out[i] {
-			out[i][j] = args[argsIdx]
-			argsIdx++
-		}
-	}
-
-	return out, err
 }

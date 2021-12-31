@@ -1,10 +1,10 @@
 package column
 
 import (
+	"fmt"
 	"strconv"
+	"sync"
 	"time"
-
-	"github.com/bytehouse-cloud/driver-go/errors"
 )
 
 func interpretTimeFormat(formats []string, texts []string, location *time.Location) func(string) (time.Time, error) {
@@ -20,17 +20,40 @@ func interpretTimeFormat(formats []string, texts []string, location *time.Locati
 }
 
 func makeParseTimeFormat(formats []string, location *time.Location) func(string) (time.Time, error) {
+	if location == nil {
+		location = time.Local
+	}
+
+	var once sync.Once
+	var chosenFormat string
+
 	return func(s string) (time.Time, error) {
 		s = processString(s)
 
-		for _, f := range formats {
-			if len(s) == len(f) {
-				return time.ParseInLocation(f, s, location)
+		var fmtErr error
+		once.Do(func() {
+			for _, f := range formats {
+				if _, err := time.ParseInLocation(f, s, location); err == nil {
+					chosenFormat = f
+					return
+				}
+				if _, err := time.ParseInLocation(s, s, location); err == nil {
+					chosenFormat = s
+					return
+				}
 			}
+			fmtErr = makeInvalidTimeFormatError(formats, s)
+		})
+		if fmtErr != nil {
+			return time.Time{}, fmtErr
 		}
 
-		return time.Time{}, errors.ErrorfWithCaller("invalid time format, expected = one of %v, got = %v", formats, s)
+		return time.ParseInLocation(chosenFormat, s, location)
 	}
+}
+
+func makeInvalidTimeFormatError(formats []string, given string) error {
+	return fmt.Errorf("invalid time format, expected = one of %v, got = %v", formats, given)
 }
 
 func parseUnixTimeStampString(s string) (time.Time, error) {

@@ -123,7 +123,7 @@ func writeIndentedStackTrace(b *strings.Builder, st string, indentLevel int) {
 	for i = 1; i < len(replacement); i++ {
 		replacement[i] = tab
 	}
-	replacementString := sixb.BtS(replacement)
+	replacementString := sixb.BtoS(replacement)
 	st = strings.ReplaceAll(st, string(newline), replacementString)
 	b.WriteString(st)
 }

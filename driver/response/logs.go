@@ -2,6 +2,7 @@ package response
 
 import (
 	"strings"
+	"time"
 
 	"github.com/bytehouse-cloud/driver-go/driver/lib/ch_encoding"
 	"github.com/bytehouse-cloud/driver-go/driver/lib/data"
@@ -42,12 +43,12 @@ func (s *LogPacket) String() string {
 
 func (s *LogPacket) packet() {}
 
-func readLogPacket(decoder *ch_encoding.Decoder) (*LogPacket, error) {
+func readLogPacket(decoder *ch_encoding.Decoder, location *time.Location) (*LogPacket, error) {
 	var (
 		serverLog LogPacket
 		err       error
 	)
-	serverLog.Table, serverLog.Block, err = readBlock(decoder, false)
+	serverLog.Table, serverLog.Block, err = readBlockWithLocation(decoder, false, location)
 	if err != nil {
 		return nil, err
 	}

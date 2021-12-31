@@ -12,12 +12,11 @@ import (
 
 func TestMultiInsertStatement(t *testing.T) {
 	utils.SkipIntegrationTestIfShort(t)
-	g, err := OpenConfig(getConfig(t))
-	require.NoError(t, err, "OpenConfig error: %s", err)
+	g := OpenConfig(getConfig(t))
 
 	ctx := context.Background()
 	var qr *QueryResult
-	qr, err = g.Query("create database if not exists test")
+	qr, err := g.Query("create database if not exists test")
 	require.NoError(t, err, "create database error: %s", err)
 	//_ = qr.Close()
 
@@ -35,7 +34,7 @@ func TestMultiInsertStatement(t *testing.T) {
 		require.NoError(t, err, "execContext error:", err)
 	}
 	err = stmt.Close()
-	require.NoError(t, err, "close error:", err)
+	require.NoError(t, err, "close error: %s", err)
 
 	qr, err = g.Query("select count() from test.multi_insert_test")
 	require.NoError(t, err, "select count() error:", err)

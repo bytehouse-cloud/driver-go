@@ -80,7 +80,7 @@ func (d *DateColumnData) ReadFromTexts(texts []string) (int, error) {
 func (d *DateColumnData) get(row int) time.Time {
 	daysSinceEpoch := bufferRowToUint16(d.raw, row)
 	secondsSinceEpoch := int64(daysSinceEpoch) * dayHours * hourSeconds
-	return time.Unix(secondsSinceEpoch-offset, 0).In(time.Local)
+	return time.Unix(secondsSinceEpoch-offset, 0)
 }
 
 func (d *DateColumnData) GetValue(row int) interface{} {

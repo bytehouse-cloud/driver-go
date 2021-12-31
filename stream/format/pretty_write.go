@@ -43,7 +43,7 @@ func (p *PrettyBlockStreamFmtWriter) BlockStreamFmtWrite(blockStream <-chan *dat
 	p.done = make(chan struct{})
 	go func() {
 		defer close(p.done)
-		p.totalRowsWrite, p.exception = helper.WriteBlockSteamToFrame(blockStream, p)
+		p.totalRowsWrite, p.exception = helper.WriteTableFromBlockStream(blockStream, p)
 	}()
 }
 

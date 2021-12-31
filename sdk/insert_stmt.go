@@ -8,20 +8,18 @@ import (
 	"github.com/bytehouse-cloud/driver-go/driver/response"
 	"github.com/bytehouse-cloud/driver-go/errors"
 	"github.com/bytehouse-cloud/driver-go/stream"
+	"github.com/bytehouse-cloud/driver-go/stream/values"
 )
 
-type ColumnValuesPool interface {
-	Get() [][]interface{}
-	Put([][]interface{})
-}
+type getColumnValues func() [][]interface{}
 
 type InsertStmt struct {
 	// Column values to be converted into blocks
 	columnsBuffer      [][]interface{}
-	bufferPool         ColumnValuesPool
+	getEmpty           getColumnValues //TODO: find way to put back into pool after usage
 	columnsInputStream chan [][]interface{}
 	insertProcess      *stream.InsertProcess
-	toBlockProcess     stream.AsyncToBlockProcess
+	toBlockProcess     values.BlockProcess
 	closed             bool
 }
 
@@ -31,19 +29,15 @@ func NewInsertStatement(
 	serverResponseStream <-chan response.Packet,
 	opts ...stream.InsertOption,
 ) *InsertStmt {
-
 	insertProcess := stream.NewInsertProcess(sample, sendBlock, cancelInsert, opts...)
 	columnsInputStream := make(chan [][]interface{}, 1)
-	parallelism := resolveInsertBlockParallelism(ctx)
+	cvPool := values.NewColumnValuesPool(sample.NumColumns, sample.NumRows)
 	newStmt := &InsertStmt{
-		bufferPool:         stream.NewColumnValuesPool(sample.NumColumns, sample.NumRows),
+		getEmpty:           cvPool.Get,
 		insertProcess:      insertProcess,
 		columnsInputStream: columnsInputStream,
 	}
-	newStmt.toBlockProcess = stream.NewAsyncColumnValuesToBlock(columnsInputStream, sample,
-		stream.OptionSetParallelism(parallelism),
-		stream.OptionSetRecycle(newStmt.bufferPool.Put),
-	)
+	newStmt.toBlockProcess = values.NewColumnValuesToBlock(columnsInputStream, sample)
 	newStmt.columnsBuffer = newStmt.getBuffer()
 
 	blockInputStream := newStmt.toBlockProcess.Start(ctx)
@@ -53,7 +47,7 @@ func NewInsertStatement(
 }
 
 func (s *InsertStmt) getBuffer() [][]interface{} {
-	colBuf := s.bufferPool.Get()
+	colBuf := s.getEmpty()
 	for i := range colBuf {
 		colBuf[i] = colBuf[i][:0]
 	}
@@ -66,20 +60,27 @@ func (s *InsertStmt) ExecContext(ctx context.Context, args ...interface{}) (err 
 	case <-ctx.Done():
 		return err
 	default:
-		if err := s.toBlockProcess.Error(); err != nil {
+		if err = s.toBlockProcess.Error(); err != nil {
 			return err
 		}
-		if err := s.insertProcess.Error(); err != nil {
+		if err = s.insertProcess.Error(); err != nil {
 			return err
 		}
 	}
 
-	if len(args) != s.insertProcess.NumColumns() {
-		return errors.ErrorfWithCaller("invalid args len, expected = %d, got = %d", s.insertProcess.NumColumns(), len(args))
+	args_len, num_cols := len(args), len(s.columnsBuffer)
+	if args_len%num_cols != 0 {
+		return errors.ErrorfWithCaller("number of args: %v must be a multiple of number of columns: %v",
+			len(args), len(s.columnsBuffer),
+		)
 	}
 
-	for i := range s.columnsBuffer {
-		s.columnsBuffer[i] = append(s.columnsBuffer[i], args[i])
+	// put all args to the column buffer
+	for len(args) > 0 {
+		for i, col := range s.columnsBuffer {
+			s.columnsBuffer[i] = append(col, args[i])
+		}
+		args = args[len(s.columnsBuffer):]
 	}
 
 	// only flush values when size of columns buffer is the same as batch
@@ -87,6 +88,7 @@ func (s *InsertStmt) ExecContext(ctx context.Context, args ...interface{}) (err 
 		return nil
 	}
 
+	// flushing
 	s.columnsInputStream <- s.columnsBuffer
 	s.columnsBuffer = s.getBuffer()
 

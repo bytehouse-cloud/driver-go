@@ -16,8 +16,7 @@ const (
 	// A block of data (compressed or not)
 	ClientScalar
 
-	// Customized for token-auth (for users)
-	ClientHelloToken
+	ClientHelloSignature
 
 	ClientHelloImpersonation
 	_

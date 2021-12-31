@@ -74,7 +74,7 @@ func (j *JSONBlockStreamFmtWriter) blockStreamFmtWrite(blockStream <-chan *data.
 	defer func() {
 		j.done <- struct{}{}
 	}()
-	j.totalRowsWrite, j.exception = helper.WriteBlockSteamToFrame(blockStream, j)
+	j.totalRowsWrite, j.exception = helper.WriteTableFromBlockStream(blockStream, j)
 }
 
 func (j *JSONBlockStreamFmtWriter) Yield() (int, error) {
@@ -209,7 +209,7 @@ func (j *JSONBlockStreamFmtWriter) writeColumnWithCheck(s string) error {
 }
 
 func (j *JSONBlockStreamFmtWriter) writeString(s string) error {
-	_, err := j.zWriter.Write(sixb.StB(s))
+	_, err := j.zWriter.Write(sixb.StoB(s))
 	return err
 }
 

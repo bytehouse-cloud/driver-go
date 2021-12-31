@@ -7,7 +7,19 @@ import (
 
 type OptionConfig func(connConfigs *ConnConfig) error
 
-func OptionRegion(region Region) OptionConfig {
+func OptionVolcano(region string) OptionConfig {
+	return func(connConfigs *ConnConfig) error {
+		hp, err := resolveVolcanoRegion(region)
+		if err != nil {
+			return err
+		}
+		connConfigs.hosts = append(connConfigs.hosts, hp)
+		connConfigs.secure = true
+		return nil
+	}
+}
+
+func OptionRegion(region string) OptionConfig {
 	return func(connConfigs *ConnConfig) error {
 		hp, err := resolveRegion(region)
 		if err != nil {

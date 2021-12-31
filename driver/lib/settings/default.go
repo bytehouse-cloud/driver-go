@@ -363,11 +363,14 @@ var Default = map[string]interface{}{
 	"allow_experimental_map_type":   false,
 	"allow_introspection_functions": false,
 
-	"skip_history":          false,
-	"ansi_sql":              false,
-	"enable_query_metadata": false,
-	"active_role":           "*",
-	"log_id":                "",
+	// Gateway
+	"skip_history":                 false,
+	"ansi_sql":                     false,
+	"enable_query_metadata":        false,
+	"active_role":                  "*",
+	"log_id":                       "",
+	"enable_direct_insert":         false,
+	"statement_timeout_in_seconds": uint64(0),
 
 	"virtual_warehouse": "",
 }

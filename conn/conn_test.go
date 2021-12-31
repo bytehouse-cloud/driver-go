@@ -11,6 +11,7 @@ import (
 	"github.com/bytehouse-cloud/driver-go/driver/lib/ch_encoding"
 	"github.com/bytehouse-cloud/driver-go/driver/lib/data"
 	"github.com/bytehouse-cloud/driver-go/driver/protocol"
+	"github.com/bytehouse-cloud/driver-go/utils"
 )
 
 func TestNewGatewayConn(t *testing.T) {
@@ -21,48 +22,43 @@ func TestNewGatewayConn(t *testing.T) {
 		{
 			name: "Can throw error if wrong query setting",
 			test: func(t *testing.T) {
-				_, err := NewGatewayConn(nil, "", &Authentication{},
-					false, map[string]string{
-						"boo": "baba",
-					})
-				require.Error(t, err)
-				require.Equal(t, "driver-go(settings.SettingToValue): query settings not found: boo", err.Error())
+				conf, _ := NewConnConfig()
+				g := NewGatewayConn(conf, "", NewPasswordAuthentication("u", "p"), false, map[string]interface{}{
+					"boo": "baba",
+				})
+				require.Error(t, g.connect())
 			},
 		},
 		{
 			name: "Can throw error if cannot connect",
 			test: func(t *testing.T) {
 				conf, _ := NewConnConfig()
-				_, err := NewGatewayConn(conf, "", &Authentication{}, false, nil)
-				require.Error(t, err)
-				require.Equal(t, "conn configs have no hosts", err.Error())
+				g := NewGatewayConn(conf, "", NewPasswordAuthentication("u", "p"), false, nil)
+				require.Error(t, g.connect())
 			},
 		},
 		{
 			name: "Can throw error if connection timeout, random open strategy",
 			test: func(t *testing.T) {
 				conf, _ := NewConnConfig(OptionHostName("localhost:123"), OptionDialStrategy(DialRandom), OptionConnTimeout(1))
-				_, err := NewGatewayConn(conf, "", &Authentication{}, false, nil)
-				require.Error(t, err)
-				require.Equal(t, "dial tcp: i/o timeout", err.Error())
+				g := NewGatewayConn(conf, "", NewPasswordAuthentication("u", "p"), false, nil)
+				require.Error(t, g.connect())
 			},
 		},
 		{
 			name: "Can throw error if connection timeout, in_order open strategy",
 			test: func(t *testing.T) {
 				conf, _ := NewConnConfig(OptionDialStrategy(DialInOrder), OptionConnTimeout(1), OptionHostName("localhost:123"))
-				_, err := NewGatewayConn(conf, "", &Authentication{}, false, nil)
-				require.Error(t, err)
-				require.Equal(t, "dial tcp: i/o timeout", err.Error())
+				g := NewGatewayConn(conf, "", NewPasswordAuthentication("u", "p"), false, nil)
+				require.Error(t, g.connect())
 			},
 		},
 		{
 			name: "Can throw error if connection timeout, time_random open strategy",
 			test: func(t *testing.T) {
 				conf, _ := NewConnConfig(OptionDialStrategy(DialTimeRandom), OptionConnTimeout(1), OptionHostName("localhost:123"))
-				_, err := NewGatewayConn(conf, "", &Authentication{}, false, nil)
-				require.Error(t, err)
-				require.Equal(t, "dial tcp: i/o timeout", err.Error())
+				g := NewGatewayConn(conf, "", NewPasswordAuthentication("u", "p"), false, nil)
+				require.Error(t, g.connect())
 			},
 		},
 	}
@@ -120,7 +116,7 @@ func TestGatewayConn_EncoderDecoder(t *testing.T) {
 				g := &GatewayConn{
 					encoder:        encoder,
 					decoder:        decoder,
-					authentication: NewAuthentication("123", "123", "123"),
+					authentication: NewPasswordAuthentication("u", "p"),
 				}
 
 				require.NoError(t, g.writeAuthentication())
@@ -140,11 +136,11 @@ func TestGatewayConn_EncoderDecoder(t *testing.T) {
 					conn: &connect{
 						Conn: &fakeConn{},
 					},
-					authentication: NewAuthentication("123", "123", "123"),
+					authentication: NewPasswordAuthentication("u", "p"),
 					logf:           func(s string, i ...interface{}) {},
 					userInfo:       NewUserInfo(),
 				}
-
+				g.connected = true
 				err := g.SendQuery("SELECT * FROM sample_table")
 				require.NoError(t, err)
 			},
@@ -163,56 +159,12 @@ func TestGatewayConn_EncoderDecoder(t *testing.T) {
 					conn: &connect{
 						Conn: &fakeConn{},
 					},
-					authentication: NewAuthentication("123", "123", "123"),
+					authentication: NewPasswordAuthentication("u", "p"),
 					logf:           func(s string, i ...interface{}) {},
 					userInfo:       NewUserInfo(),
 				}
 
-				require.NoError(t, g.SendCancel())
-			},
-		},
-		{
-			name: "Test Send token",
-			test: func(t *testing.T) {
-				var buffer bytes.Buffer
-				encoder := ch_encoding.NewEncoder(&buffer)
-				decoder := ch_encoding.NewDecoder(&buffer)
-				conf, _ := NewConnConfig()
-				g := &GatewayConn{
-					encoder:     encoder,
-					decoder:     decoder,
-					connOptions: conf,
-					conn: &connect{
-						Conn: &fakeConn{},
-					},
-					authentication: NewAuthentication("123", "123", "123"),
-					logf:           func(s string, i ...interface{}) {},
-					userInfo:       NewUserInfo(),
-				}
-
-				require.NoError(t, g.sendUsernameOrToken())
-			},
-		},
-		{
-			name: "Test Send User",
-			test: func(t *testing.T) {
-				var buffer bytes.Buffer
-				encoder := ch_encoding.NewEncoder(&buffer)
-				decoder := ch_encoding.NewDecoder(&buffer)
-				conf, _ := NewConnConfig()
-				g := &GatewayConn{
-					encoder:     encoder,
-					decoder:     decoder,
-					connOptions: conf,
-					conn: &connect{
-						Conn: &fakeConn{},
-					},
-					authentication: NewAuthentication("", "123", "123"),
-					logf:           func(s string, i ...interface{}) {},
-					userInfo:       NewUserInfo(),
-				}
-
-				require.NoError(t, g.sendUsernameOrToken())
+				g.Cancel()
 			},
 		},
 		{
@@ -230,18 +182,19 @@ func TestGatewayConn_EncoderDecoder(t *testing.T) {
 						Conn: &fakeConn{},
 					},
 					settings:       make(map[string]interface{}),
-					authentication: NewAuthentication("123", "123", "123"),
+					authentication: NewPasswordAuthentication("u", "p"),
 					logf:           func(s string, i ...interface{}) {},
 					userInfo:       NewUserInfo(),
 				}
 
-				require.NoError(t, g.AddSetting("min_compress_block_size", "100"))
-				require.NoError(t, g.AddSetting("allow_experimental_cross_to_join_conversion", "true"))
-				require.NoError(t, g.AddSetting("send_logs_level", "fatal"))
-				require.NoError(t, g.AddSetting("totals_auto_threshold", "10.0"))
-				require.NoError(t, g.AddSetting("optimize_subpart_number", "-1"))
-				require.NoError(t, g.AddSetting("totals_auto_threshold", "1.02349"))
+				g.AddSettingChecked("min_compress_block_size", "100")
+				g.AddSettingChecked("allow_experimental_cross_to_join_conversion", "true")
+				g.AddSettingChecked("send_logs_level", "fatal")
+				g.AddSettingChecked("totals_auto_threshold", "10.0")
+				g.AddSettingChecked("optimize_subpart_number", "-1")
+				g.AddSettingChecked("totals_auto_threshold", "1.02349")
 
+				g.connected = true
 				err = g.SendQuery("SELECT * FROM sample_table")
 				require.NoError(t, err)
 			},
@@ -260,7 +213,7 @@ func TestGatewayConn_EncoderDecoder(t *testing.T) {
 					conn: &connect{
 						Conn: &fakeConn{},
 					},
-					authentication: NewAuthentication("123", "123", "123"),
+					authentication: NewPasswordAuthentication("u", "p"),
 					logf:           func(s string, i ...interface{}) {},
 				}
 
@@ -285,7 +238,7 @@ func TestGatewayConn_EncoderDecoder(t *testing.T) {
 					conn: &connect{
 						Conn: &fakeConn{},
 					},
-					authentication: NewAuthentication("", "123", "123"),
+					authentication: NewPasswordAuthentication("123", "123"),
 					logf:           func(s string, i ...interface{}) {},
 				}
 
@@ -311,7 +264,7 @@ func TestGatewayConn_EncoderDecoder(t *testing.T) {
 					conn: &connect{
 						Conn: &fakeConn{},
 					},
-					authentication: NewAuthentication("123", "123", "123"),
+					authentication: NewPasswordAuthentication("u", "p"),
 					logf:           func(s string, i ...interface{}) {},
 				}
 
@@ -337,9 +290,10 @@ func TestGatewayConn_EncoderDecoder(t *testing.T) {
 					conn: &connect{
 						Conn: &fakeConn{},
 					},
-					authentication: NewAuthentication("123", "123", "123"),
+					authentication: NewPasswordAuthentication("u", "p"),
 				}
 
+				g.connected = true
 				require.NoError(t, g.CheckConnection())
 			},
 		},
@@ -358,7 +312,7 @@ func TestGatewayConn_EncoderDecoder(t *testing.T) {
 					conn: &connect{
 						Conn: &fakeConn{},
 					},
-					authentication: NewAuthentication("123", "123", "123"),
+					authentication: NewPasswordAuthentication("u", "p"),
 				}
 
 				err := g.Close()
@@ -382,7 +336,7 @@ func TestGatewayConn_EncoderDecoder(t *testing.T) {
 					conn: &connect{
 						Conn: &fakeConn{},
 					},
-					authentication: NewAuthentication("123", "123", "123"),
+					authentication: NewPasswordAuthentication("u", "p"),
 				}
 
 				g.SetLog(func(s string, i ...interface{}) {
@@ -416,7 +370,7 @@ func TestGatewayConn_EncoderDecoder(t *testing.T) {
 						DisplayName:  "hello",
 						VersionPatch: 0,
 					},
-					authentication: NewAuthentication("123", "123", "123"),
+					authentication: NewPasswordAuthentication("u", "p"),
 				}
 
 				require.Equal(t, g.GetDisplayName(), "hello")
@@ -431,6 +385,13 @@ func TestGatewayConn_EncoderDecoder(t *testing.T) {
 }
 
 func TestGatewayConn_Settings(t *testing.T) {
+	utils.SkipIntegrationTestIfShort(t)
+	conf, _ := NewConnConfig(OptionDialStrategy(DialInOrder), OptionHostName("localhost:9000"))
+	g := NewGatewayConn(
+		conf, "default", NewPasswordAuthentication("default", ""),
+		false, map[string]interface{}{},
+	)
+
 	tests := []struct {
 		name string
 		test func(t *testing.T)
@@ -438,36 +399,30 @@ func TestGatewayConn_Settings(t *testing.T) {
 		{
 			name: "Test add setting fail if setting not found",
 			test: func(t *testing.T) {
-				g := &GatewayConn{
-					settings: make(map[string]interface{}),
-				}
-
-				err := g.AddSetting("jack", "john")
+				cur_con := g.Clone()
+				err := cur_con.AddSetting("jack", "john")
 				require.Error(t, err)
 			},
 		},
 		{
 			name: "Test add setting success if valid setting",
 			test: func(t *testing.T) {
-				g := &GatewayConn{
-					settings: make(map[string]interface{}),
-				}
-
-				err := g.AddSetting("min_compress_block_size", "123")
+				cur_con := g.Clone()
+				err := cur_con.AddSetting("min_compress_block_size", "123")
 				require.NoError(t, err)
 			},
 		},
-		{
-			name: "Test add setting checked success even if invalid setting",
-			test: func(t *testing.T) {
-				g := &GatewayConn{
-					settings: make(map[string]interface{}),
-				}
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, tt.test)
+	}
+}
 
-				g.AddSettingsChecked("jack", "john")
-				require.Equal(t, "john", g.GetAllSettings()["jack"])
-			},
-		},
+func TestGatewayConn_SettingsChecked(t *testing.T) {
+	tests := []struct {
+		name string
+		test func(t *testing.T)
+	}{
 		{
 			name: "Test is ansi sql mode if added setting as true",
 			test: func(t *testing.T) {
@@ -475,9 +430,7 @@ func TestGatewayConn_Settings(t *testing.T) {
 					settings: make(map[string]interface{}),
 				}
 
-				err := g.AddSetting("ansi_sql", "true")
-				require.NoError(t, err)
-
+				g.AddSettingChecked("ansi_sql", true)
 				require.True(t, g.InAnsiSQLMode())
 			},
 		},
@@ -488,9 +441,7 @@ func TestGatewayConn_Settings(t *testing.T) {
 					settings: make(map[string]interface{}),
 				}
 
-				err := g.AddSetting("ansi_sql", "false")
-				require.NoError(t, err)
-
+				g.AddSettingChecked("ansi_sql", false)
 				require.False(t, g.InAnsiSQLMode())
 			},
 		},

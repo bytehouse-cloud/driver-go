@@ -2,29 +2,66 @@ package conn
 
 import (
 	"github.com/bytehouse-cloud/driver-go/driver/lib/ch_encoding"
+	"github.com/bytehouse-cloud/driver-go/driver/protocol"
 )
 
-type Authentication struct {
-	token    string
-	username string
+const (
+	service = "bytehouse"
+	request = "request"
+)
+
+type Authentication interface {
+	WriteAuthProtocol(*ch_encoding.Encoder) error
+	WriteAuthData(*ch_encoding.Encoder) error
+	Identity() string
+}
+
+type PasswordAuthentication struct {
+	user     string
 	password string
 }
 
-func NewAuthentication(token, username, password string) *Authentication {
-	return &Authentication{
-		token:    token,
-		username: username,
+func NewPasswordAuthentication(user, password string) *PasswordAuthentication {
+	return &PasswordAuthentication{
+		user:     user,
 		password: password,
 	}
 }
 
-func (a *Authentication) WriteToEncoder(encoder *ch_encoding.Encoder) error {
-	if a.token != "" {
-		return encoder.String(a.token)
-	}
-	err := encoder.String(a.username)
+func (p *PasswordAuthentication) WriteAuthProtocol(encoder *ch_encoding.Encoder) error {
+	return encoder.Uvarint(protocol.ClientHello)
+}
+
+func (p *PasswordAuthentication) WriteAuthData(encoder *ch_encoding.Encoder) error {
+	err := encoder.String(p.user)
 	if err != nil {
 		return err
 	}
-	return encoder.String(a.password)
+	return encoder.String(p.password)
+}
+
+func (p *PasswordAuthentication) Identity() string {
+	return p.user
+}
+
+type SystemAuthentication struct {
+	token string
+}
+
+func NewSystemAuthentication(token string) *SystemAuthentication {
+	return &SystemAuthentication{
+		token: token,
+	}
+}
+
+func (s *SystemAuthentication) WriteAuthProtocol(encoder *ch_encoding.Encoder) error {
+	return encoder.Uvarint(protocol.ClientSystemHello)
+}
+
+func (s *SystemAuthentication) WriteAuthData(encoder *ch_encoding.Encoder) error {
+	return encoder.String(s.token)
+}
+
+func (s *SystemAuthentication) Identity() string {
+	return s.token
 }

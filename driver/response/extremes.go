@@ -2,6 +2,7 @@ package response
 
 import (
 	"strings"
+	"time"
 
 	"github.com/bytehouse-cloud/driver-go/driver/lib/ch_encoding"
 	"github.com/bytehouse-cloud/driver-go/driver/lib/data"
@@ -25,12 +26,12 @@ func (s *ExtremesPacket) String() string {
 
 func (s *ExtremesPacket) packet() {}
 
-func readExtremesPacket(decoder *ch_encoding.Decoder, compress bool) (*ExtremesPacket, error) {
+func readExtremesPacket(decoder *ch_encoding.Decoder, compress bool, location *time.Location) (*ExtremesPacket, error) {
 	var (
 		extremes ExtremesPacket
 		err      error
 	)
-	extremes.Table, extremes.Block, err = readBlock(decoder, compress)
+	extremes.Table, extremes.Block, err = readBlockWithLocation(decoder, compress, location)
 	if err != nil {
 		return nil, err
 	}

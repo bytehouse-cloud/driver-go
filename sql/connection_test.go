@@ -175,8 +175,9 @@ func TestConnection(t *testing.T) {
 
 	require.NoError(t, st.Close())
 	require.NoError(t, ch.Close())
-	require.Equal(t, ch.ResetSession(context.Background()), driver.ErrBadConn)
-	require.Equal(t, ch.Ping(context.Background()), driver.ErrBadConn)
+	ch.Gateway.Conn.SendQuery("select 1")
+	require.Equal(t, driver.ErrBadConn, ch.ResetSession(context.Background()))
+	require.Equal(t, driver.ErrBadConn, ch.Ping(context.Background()))
 }
 
 func TestGetConn(t *testing.T) {

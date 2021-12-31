@@ -65,6 +65,7 @@ func TestCSVBlockStreamFmtWriter_BlockStreamFmtWrite(t *testing.T) {
 		blockStreamWriter BlockStreamFmtWriter
 		args              args
 		wantRowsRead      int
+		wantErr           bool
 	}{
 		{
 			name: "Can parse block into block stream, with correct rows read",
@@ -149,7 +150,7 @@ func TestCSVBlockStreamFmtWriter_BlockStreamFmtWrite(t *testing.T) {
 				sample:    int32Sample,
 				blockSize: 1,
 			},
-			wantRowsRead: 0,
+			wantErr: true,
 		},
 		{
 			name: "Should not read subsequent blocks if csv format wrong",
@@ -166,15 +167,18 @@ func TestCSVBlockStreamFmtWriter_BlockStreamFmtWrite(t *testing.T) {
 				sample:    int32Sample,
 				blockSize: 1,
 			},
-			wantRowsRead: 1,
+			wantErr: true,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			blockStream := tt.blockStreamReader.BlockStreamFmtRead(tt.args.ctx, tt.args.sample, tt.args.blockSize)
+			blockStream, yield := tt.blockStreamReader.BlockStreamFmtRead(tt.args.ctx, tt.args.sample, tt.args.blockSize)
 			tt.blockStreamWriter.BlockStreamFmtWrite(blockStream)
-			rows, err := tt.blockStreamWriter.Yield()
+			rows, err := yield()
+			if tt.wantErr && err != nil {
+				return
+			}
 			require.NoError(t, err)
 			require.Equal(t, rows, tt.wantRowsRead)
 		})
@@ -198,7 +202,7 @@ func TestNewCSVBlockStreamFmtWriter(t *testing.T) {
 			name:        "if 1 block with names then output csv with names",
 			withNames:   true,
 			givenBlocks: []*data.Block{makeSampleBlock()},
-			fmtResult: `col1,col1,col2
+			fmtResult: `col1,col2
 "string1",123
 "string2",456`,
 		},
@@ -206,7 +210,7 @@ func TestNewCSVBlockStreamFmtWriter(t *testing.T) {
 			name:        "if 2 blocks with names then output col names only once",
 			withNames:   true,
 			givenBlocks: []*data.Block{makeSampleBlock(), makeSampleBlock()},
-			fmtResult: `col1,col1,col2
+			fmtResult: `col1,col2
 "string1",123
 "string2",456
 "string1",123
@@ -222,7 +226,7 @@ func TestNewCSVBlockStreamFmtWriter(t *testing.T) {
 			settings:    map[string]interface{}{"format_csv_delimiter": "|"},
 			givenBlocks: []*data.Block{makeSampleBlock()},
 			withNames:   true,
-			fmtResult: `col1|col1|col2
+			fmtResult: `col1|col2
 "string1"|123
 "string2"|456`,
 		},

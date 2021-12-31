@@ -2,6 +2,7 @@ package response
 
 import (
 	"strings"
+	"time"
 
 	"github.com/bytehouse-cloud/driver-go/driver/lib/ch_encoding"
 	"github.com/bytehouse-cloud/driver-go/driver/lib/data"
@@ -25,12 +26,12 @@ func (s *TotalsPacket) String() string {
 
 func (s TotalsPacket) packet() {}
 
-func readTotalsPacket(decoder *ch_encoding.Decoder, compress bool) (*TotalsPacket, error) {
+func readTotalsPacket(decoder *ch_encoding.Decoder, compress bool, location *time.Location) (*TotalsPacket, error) {
 	var (
 		totals TotalsPacket
 		err    error
 	)
-	totals.Table, totals.Block, err = readBlock(decoder, compress)
+	totals.Table, totals.Block, err = readBlockWithLocation(decoder, compress, location)
 	if err != nil {
 		return nil, err
 	}

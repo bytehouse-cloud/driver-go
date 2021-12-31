@@ -2,12 +2,17 @@ package response
 
 import (
 	"strconv"
+	"time"
 
 	"github.com/bytehouse-cloud/driver-go/driver/lib/ch_encoding"
 	"github.com/bytehouse-cloud/driver-go/driver/lib/data"
 )
 
 func readBlock(decoder *ch_encoding.Decoder, compress bool) (string, *data.Block, error) {
+	return readBlockWithLocation(decoder, compress, nil)
+}
+
+func readBlockWithLocation(decoder *ch_encoding.Decoder, compress bool, location *time.Location) (string, *data.Block, error) {
 	var (
 		err       error
 		tempTable string
@@ -18,7 +23,7 @@ func readBlock(decoder *ch_encoding.Decoder, compress bool) (string, *data.Block
 		return emptyString, nil, err
 	}
 	decoder.SetCompress(compress)
-	block, err = data.ReadBlockFromDecoder(decoder)
+	block, err = data.ReadBlockFromDecoderWithLocation(decoder, location)
 	if err != nil {
 		return emptyString, nil, err
 	}

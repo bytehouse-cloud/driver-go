@@ -1,7 +1,6 @@
 package param
 
 const (
-	// List of Parameters, Ref: http://github.com/bytehouse-cloud/clickhouse-go
 	COMPRESS                 string = "compress"
 	USER                     string = "user"
 	PASSWORD                 string = "password"
@@ -27,4 +26,7 @@ const (
 	SKIP_HISTORY             string = "skip_history"
 	IS_SYSTEM                string = "is_system"
 	REGION                   string = "region"
+	ACCESS_KEY               string = "access_key"
+	SECRET_KEY               string = "secret_key"
+	VOLCANO                  string = "volcano"
 )

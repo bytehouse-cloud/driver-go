@@ -9,14 +9,16 @@ import (
 	"github.com/bytehouse-cloud/driver-go/errors"
 )
 
-func SettingToValue(key string, value interface{}) (interface{}, error) {
-	defVal, ok := Default[key]
+// SettingToValue attempts to convert settings value to the proper type
+// given setting name
+func SettingToValue(name string, value interface{}) (interface{}, error) {
+	defVal, ok := Default[name]
 	if !ok {
-		return nil, errors.ErrorfWithCaller("query settings not found: %v", key)
+		return nil, errors.ErrorfWithCaller("query settings not found: %v", name)
 	}
 	v, err := parseValueInterface(value, defVal)
 	if err != nil {
-		return nil, errors.ErrorfWithCaller("parsing error for %v: %s", key, err)
+		return nil, errors.ErrorfWithCaller("parsing error for %v: %s", name, err)
 	}
 	return v, nil
 }
@@ -32,7 +34,7 @@ func parseValueInterface(value interface{}, defVal interface{}) (interface{}, er
 	case float32:
 		return tryConvertFloat32(value)
 	case string:
-		return fmt.Sprint(value), nil
+		return removeSingleQuoteOptional(fmt.Sprint(value)), nil
 	default:
 		return nil, fmt.Errorf("unknown data type %T for %v", defVal, defVal)
 	}
@@ -152,4 +154,15 @@ func tryConvertBool(value interface{}) (bool, error) {
 	default:
 		return false, fmt.Errorf("data type expected: %T, got: %T", uint64(0), value)
 	}
+}
+
+func removeSingleQuoteOptional(quoted string) string {
+	if len(quoted) < 2 {
+		return quoted
+	}
+	if quoted[0] == '\'' &&
+		quoted[len(quoted)-1] == '\'' {
+		return quoted[1 : len(quoted)-1]
+	}
+	return quoted
 }

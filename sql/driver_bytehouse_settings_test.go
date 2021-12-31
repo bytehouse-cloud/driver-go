@@ -26,19 +26,19 @@ func TestInsertPrepareSettings(t *testing.T) {
 		{
 			name: "given batch size then success",
 			opts: []opt{func(bhCtx *bytehouse.QueryContext) error {
-				return bhCtx.AddByteHouseSetting(bytehouse.InsertBlockSize, 50)
+				return bhCtx.AddClientSetting(bytehouse.InsertBlockSize, 50)
 			}},
 		},
 		{
 			name: "given connection count then success",
 			opts: []opt{func(bhCtx *bytehouse.QueryContext) error {
-				return bhCtx.AddByteHouseSetting(bytehouse.InsertConnectionCount, 2)
+				return bhCtx.AddClientSetting(bytehouse.InsertConnectionCount, 2)
 			}},
 		},
 		{
 			name: "given block process parallelism then success",
 			opts: []opt{func(bhCtx *bytehouse.QueryContext) error {
-				return bhCtx.AddByteHouseSetting(bytehouse.InsertBlockParallelism, 2)
+				return bhCtx.AddClientSetting(bytehouse.InsertBlockParallelism, 2)
 			}},
 		},
 	}
@@ -88,5 +88,6 @@ func TestInsertPrepareSettings(t *testing.T) {
 			require.NoError(t, rows.Scan(&count))
 			require.Equal(t, fmt.Sprint(count), fmt.Sprint(numRows))
 		})
+		time.Sleep(time.Second)
 	}
 }

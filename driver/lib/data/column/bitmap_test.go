@@ -2,7 +2,6 @@ package column
 
 import (
 	"bytes"
-	"fmt"
 	"sort"
 	"strconv"
 	"strings"
@@ -102,7 +101,6 @@ func TestBitmapColumnData_ReadFromTexts(t *testing.T) {
 			i := MustMakeColumnData(tt.columnType, len(tt.args.texts))
 
 			got, err := i.ReadFromTexts(tt.args.texts)
-			fmt.Println(err)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("ReadFromTexts() error = %v, wantErr %v", err, tt.wantErr)
 				return

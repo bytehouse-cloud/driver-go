@@ -32,7 +32,7 @@ func (v *ValuesBlockStreamFmtWriter) blockStreamFmtWrite(blockStream <-chan *dat
 	defer func() {
 		v.done <- struct{}{}
 	}()
-	v.totalRowsWrite, v.exception = helper.WriteBlockSteamToFrame(blockStream, v)
+	v.totalRowsWrite, v.exception = helper.WriteTableFromBlockStream(blockStream, v)
 }
 
 func (v *ValuesBlockStreamFmtWriter) Yield() (int, error) {
