@@ -4,7 +4,7 @@
 
 ### Connect to ByteHouse
 
-1. Connect with Username and Password.
+#### 1. Connect with Username and Password.
 
 To connect to the ByteHouse, you need to specify the ByteHouse gateway URL with your account and user information. You
 can visit [ByteHouse China](bytehouse.cn) (for China-mainland) or [Bytehouse Global](bytehouse.cloud) (for
@@ -26,7 +26,7 @@ if err != nil {
 defer db.Close()
 
 ```
-2. Connect with Access Key ID/ Secret Access Key (AK/SK)
+#### 2. Connect with Access Key ID/ Secret Access Key (AK/SK)
 
 - For ByteHouse Global/China version, users can create and download credentials from [console](https://console.bytehouse.cloud/account/details)
 - For ByteHouse Volcano Cloud Version, users need to create and download credentials from Volcano Cloud's [Key Management page](https://console.volcengine.com/iam/keymanage/)
