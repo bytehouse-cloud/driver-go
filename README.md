@@ -4,6 +4,8 @@
 
 ### Connect to ByteHouse
 
+1. Connect with Username and Password.
+
 To connect to the ByteHouse, you need to specify the ByteHouse gateway URL with your account and user information. You
 can visit [ByteHouse China](bytehouse.cn) (for China-mainland) or [Bytehouse Global](bytehouse.cloud) (for
 non-China-mainland) to register account.
@@ -23,6 +25,46 @@ if err != nil {
 }
 defer db.Close()
 
+```
+2. Connect with Access Key ID/ Secret Access Key (AK/SK)
+
+- For ByteHouse Global/China version, users can create and download credentials from [console](https://console.bytehouse.cloud/account/details)
+- For ByteHouse Volcano Cloud Version, users need to create and download credentials from Volcano Cloud's [Key Management page](https://console.volcengine.com/iam/keymanage/)
+
+```go
+package main
+
+import (
+	"context"
+	"fmt"
+
+	"github.com/bytehouse-cloud/driver-go/sdk"
+)
+
+func main() {
+    dsn := fmt.Sprintf("tcp://?region=cn-beijing&volcano=true&access_key=%v&secret_key=%v",
+        "<your ak>",
+        "<your sk>",
+    )
+
+    g, err := sdk.Open(context.Background(), dsn)
+    if err != nil{
+        panic(err)
+    }
+
+    if err := g.Ping(); err != nil {
+        panic(err)
+    }
+
+    res, err := g.Query("select 1, 2, 3")
+    for {
+        row, ok := res.NextRow()
+        if !ok {
+            break
+        }
+        fmt.Println(row)
+    }
+}
 ```
 
 ### DDL
