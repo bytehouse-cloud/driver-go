@@ -67,7 +67,7 @@ func main() {
 }
 ```
 
-### DDL
+### Data Definition Language (DDL)
 
 All DDL queries should be done with db.ExecContext
 
