@@ -7,6 +7,8 @@ import (
 	"net"
 	"time"
 
+	"github.com/bytehouse-cloud/driver-go/driver/lib/bytepool/mocks"
+
 	"github.com/bytehouse-cloud/driver-go/driver/lib/ch_encoding"
 	"github.com/bytehouse-cloud/driver-go/driver/lib/data"
 )
@@ -57,9 +59,10 @@ func MockConn() *GatewayConn {
 		connected:   true,
 		encoder:     encoder,
 		decoder:     decoder,
-		connOptions: &ConnConfig{},
+		connConfigs: &ConnConfig{},
 		conn: &connect{
-			Conn: &fakeConn{},
+			Conn:    &fakeConn{},
+			zReader: mocks.NewFakedZReader(),
 		},
 		authentication: NewPasswordAuthentication("123", "123"),
 		logf:           func(s string, i ...interface{}) {},

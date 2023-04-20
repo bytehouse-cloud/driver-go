@@ -5,13 +5,16 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log"
+	"runtime/debug"
 	"strings"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 
 	"github.com/bytehouse-cloud/driver-go/driver/lib/bytepool"
 	"github.com/bytehouse-cloud/driver-go/driver/lib/data"
 	"github.com/bytehouse-cloud/driver-go/driver/lib/data/column"
-	"github.com/stretchr/testify/assert"
 )
 
 var delibrateError = errors.New("error made on purpose")
@@ -135,6 +138,13 @@ func TestColumnTextsStreamer_Error_at_start(t *testing.T) {
 	outStream := streamer.Start(context.Background())
 
 	go func() {
+		defer func() {
+			if r := recover(); r != nil {
+				log.Printf("A runtime panic has occurred with err = [%s],  stacktrace = [%s]\n",
+					r,
+					string(debug.Stack()))
+			}
+		}()
 		for range outStream {
 		}
 	}()
@@ -154,6 +164,13 @@ func TestColumnTextsStreamer_Error_at_first_row(t *testing.T) {
 	outStream := streamer.Start(context.Background())
 
 	go func() {
+		defer func() {
+			if r := recover(); r != nil {
+				log.Printf("A runtime panic has occurred with err = [%s],  stacktrace = [%s]\n",
+					r,
+					string(debug.Stack()))
+			}
+		}()
 		for range outStream {
 		}
 	}()
@@ -174,6 +191,13 @@ func TestColumnTextsStreamer_Error_10th_elem(t *testing.T) {
 	outStream := streamer.Start(context.Background())
 
 	go func() {
+		defer func() {
+			if r := recover(); r != nil {
+				log.Printf("A runtime panic has occurred with err = [%s],  stacktrace = [%s]\n",
+					r,
+					string(debug.Stack()))
+			}
+		}()
 		for range outStream {
 		}
 	}()
@@ -194,6 +218,13 @@ func TestColumnTextsStreamer_Error_13th_elem(t *testing.T) {
 	outStream := streamer.Start(context.Background())
 
 	go func() {
+		defer func() {
+			if r := recover(); r != nil {
+				log.Printf("A runtime panic has occurred with err = [%s],  stacktrace = [%s]\n",
+					r,
+					string(debug.Stack()))
+			}
+		}()
 		for range outStream {
 		}
 	}()

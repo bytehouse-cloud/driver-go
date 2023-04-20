@@ -73,7 +73,7 @@ func (v *ValuesBlockStreamFmtReader) ReadElem(fb *bytepool.FrameBuffer, cols []*
 
 func (v *ValuesBlockStreamFmtReader) readElem(fb *bytepool.FrameBuffer, col *column.CHColumn, last bool) error {
 	if last {
-		return helper.ReadCHElemTillStop(fb, v.zReader, col, ')')
+		return helper.ReadCHElemTillStop(fb, v.zReader, col.Data, ')')
 	}
-	return helper.ReadCHElemTillStop(fb, v.zReader, col, ',')
+	return helper.ReadCHElemTillStop(fb, v.zReader, col.Data, ',')
 }

@@ -96,7 +96,7 @@ func TestLowCardinalityColumnData_ReadFromTexts(t *testing.T) {
 		},
 		// Disable tests for wrapped complex types since not supported
 		// See https://clickhouse.tech/docs/en/sql-reference/data-types/lowcardinality/ for supported types
-		//{
+		// {
 		//	name:       "Should write data and return number of rows read with no error, 2 rows",
 		//	columnType: "LowCardinality(Map(Int8, String))",
 		//	args: args{
@@ -105,8 +105,8 @@ func TestLowCardinalityColumnData_ReadFromTexts(t *testing.T) {
 		//	wantDataWritten: []string{"{1: 2}", "{1: 2}", "{1: 2}", "{1: 2}"},
 		//	wantRowsRead:    4,
 		//	wantErr:         false,
-		//},
-		//{
+		// },
+		// {
 		//	name:       "Should write data and return number of rows read with no error, 3 rows",
 		//	columnType: "LowCardinality(Array(UInt8))",
 		//	args: args{
@@ -115,8 +115,8 @@ func TestLowCardinalityColumnData_ReadFromTexts(t *testing.T) {
 		//	wantDataWritten: []string{"[1, 1]", "[1, 3, 3, 44, 3]", "[1, 33, 33, 3]"},
 		//	wantRowsRead:    3,
 		//	wantErr:         false,
-		//},
-		//{
+		// },
+		// {
 		//	name:       "Should write data and return number of rows read with no error, nested arrays",
 		//	columnType: "LowCardinality(Array(LowCardinality(Array(UInt8))))",
 		//	args: args{
@@ -125,8 +125,8 @@ func TestLowCardinalityColumnData_ReadFromTexts(t *testing.T) {
 		//	wantDataWritten: []string{"[[1, 1], [1, 3, 3, 4]]", "[[1, 1], [1, 3, 3, 4]]", "[[1, 1], [1, 3, 3, 4]]"},
 		//	wantRowsRead:    3,
 		//	wantErr:         false,
-		//},
-		//{
+		// },
+		// {
 		//	name:       "Should throw error if invalid value, 2 rows",
 		//	columnType: "LowCardinality(Array(UInt8))",
 		//	args: args{
@@ -135,8 +135,8 @@ func TestLowCardinalityColumnData_ReadFromTexts(t *testing.T) {
 		//	wantDataWritten: []string{"[]"},
 		//	wantRowsRead:    0,
 		//	wantErr:         true,
-		//},
-		//{
+		// },
+		// {
 		//	name:       "Should return empty array",
 		//	columnType: "LowCardinality(Array(UInt8))",
 		//	args: args{
@@ -145,8 +145,8 @@ func TestLowCardinalityColumnData_ReadFromTexts(t *testing.T) {
 		//	wantDataWritten: []string{"[]"},
 		//	wantRowsRead:    1,
 		//	wantErr:         false,
-		//},
-		//{
+		// },
+		// {
 		//	name:       "Should return empty array",
 		//	columnType: "LowCardinality(Array(UInt8))",
 		//	args: args{
@@ -155,8 +155,8 @@ func TestLowCardinalityColumnData_ReadFromTexts(t *testing.T) {
 		//	wantDataWritten: []string{"[]"},
 		//	wantRowsRead:    1,
 		//	wantErr:         false,
-		//},
-		//{
+		// },
+		// {
 		//	name:       "Should return empty array and some other array",
 		//	columnType: "LowCardinality(Array(UInt8))",
 		//	args: args{
@@ -165,8 +165,8 @@ func TestLowCardinalityColumnData_ReadFromTexts(t *testing.T) {
 		//	wantDataWritten: []string{"[]", "[1, 2]", "[]"},
 		//	wantRowsRead:    3,
 		//	wantErr:         false,
-		//},
-		//{
+		// },
+		// {
 		//	name:       "Should throw error if invalid value, 2 rows",
 		//	columnType: "LowCardinality(Array(UInt8))",
 		//	args: args{
@@ -175,8 +175,8 @@ func TestLowCardinalityColumnData_ReadFromTexts(t *testing.T) {
 		//	wantDataWritten: []string{"[]"},
 		//	wantRowsRead:    0,
 		//	wantErr:         true,
-		//},
-		//{
+		// },
+		// {
 		//	name:       "Should throw error if invalid value, 2 rows",
 		//	columnType: "LowCardinality(Array(UInt8))",
 		//	args: args{
@@ -185,8 +185,8 @@ func TestLowCardinalityColumnData_ReadFromTexts(t *testing.T) {
 		//	wantDataWritten: []string{"[]"},
 		//	wantRowsRead:    1,
 		//	wantErr:         true,
-		//},
-		//{
+		// },
+		// {
 		//	name:       "Should throw error if invalid value, 2 rows",
 		//	columnType: "LowCardinality(Array(UInt8))",
 		//	args: args{
@@ -195,8 +195,8 @@ func TestLowCardinalityColumnData_ReadFromTexts(t *testing.T) {
 		//	wantDataWritten: []string{"[]"},
 		//	wantRowsRead:    1,
 		//	wantErr:         true,
-		//},
-		//{
+		// },
+		// {
 		//	name:       "Should throw error if invalid value, 2 rows",
 		//	columnType: "LowCardinality(Array(UInt8))",
 		//	args: args{
@@ -205,7 +205,7 @@ func TestLowCardinalityColumnData_ReadFromTexts(t *testing.T) {
 		//	wantDataWritten: []string{"[]"},
 		//	wantRowsRead:    2,
 		//	wantErr:         true,
-		//},
+		// },
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -261,7 +261,7 @@ func TestLowCardinalityColumnData_ReadFromValues(t *testing.T) {
 					"poooo", 123,
 				},
 			},
-			//wantDataWritten: []string{"poooo"},
+			// wantDataWritten: []string{"poooo"},
 			wantRowsRead: 1,
 			wantErr:      true,
 		},
@@ -304,7 +304,7 @@ func TestLowCardinalityColumnData_ReadFromValues(t *testing.T) {
 		// Disable tests for wrapped complex types since not supported
 		// See https://clickhouse.tech/docs/en/sql-reference/data-types/lowcardinality/ for supported types
 		//
-		//{
+		// {
 		//	name:       "Should write data and return number of rows read with no error",
 		//	columnType: "LowCardinality(Map(UInt64, UInt64))",
 		//	args: args{
@@ -314,8 +314,8 @@ func TestLowCardinalityColumnData_ReadFromValues(t *testing.T) {
 		//	wantDataWritten: []string{"{1: 3}"},
 		//	wantRowsRead:    1,
 		//	wantErr:         false,
-		//},
-		//{
+		// },
+		// {
 		//	name:       "Should write data and return number of rows read with no error",
 		//	columnType: "LowCardinality(Map(UInt64, UInt64))",
 		//	args: args{
@@ -324,8 +324,8 @@ func TestLowCardinalityColumnData_ReadFromValues(t *testing.T) {
 		//	wantDataWritten: []string{"{1: 3}", "{1: 3}"},
 		//	wantRowsRead:    2,
 		//	wantErr:         false,
-		//},
-		//{
+		// },
+		// {
 		//	name:       "Should write data and return number of rows read with no error if empty",
 		//	columnType: "LowCardinality(Map(UInt8, UInt32))",
 		//	args: args{
@@ -335,8 +335,8 @@ func TestLowCardinalityColumnData_ReadFromValues(t *testing.T) {
 		//	wantEqualValues: true,
 		//	wantRowsRead:    1,
 		//	wantErr:         false,
-		//},
-		//{
+		// },
+		// {
 		//	name:       "Should return empty map and some other map",
 		//	columnType: "LowCardinality(Map(UInt8, UInt8))",
 		//	args: args{
@@ -345,8 +345,8 @@ func TestLowCardinalityColumnData_ReadFromValues(t *testing.T) {
 		//	wantDataWritten: []string{"{}", "{1: 2}", "{}"},
 		//	wantRowsRead:    3,
 		//	wantErr:         false,
-		//},
-		//{
+		// },
+		// {
 		//	name:       "Should write data and return number of rows read with no error, nested maps",
 		//	columnType: "LowCardinality(Map(UInt8,Map(UInt8, UInt8)))",
 		//	args: args{
@@ -356,8 +356,8 @@ func TestLowCardinalityColumnData_ReadFromValues(t *testing.T) {
 		//	wantEqualValues: true,       // test values equality
 		//	wantRowsRead:    2,
 		//	wantErr:         false,
-		//},
-		//{
+		// },
+		// {
 		//	name:       "Should write data and return number of rows read with no error, struct as key",
 		//	columnType: "LowCardinality(Map(Map(String, UInt8), UInt8))",
 		//	args: args{
@@ -366,8 +366,8 @@ func TestLowCardinalityColumnData_ReadFromValues(t *testing.T) {
 		//	wantDataWritten: []string{"{{Key: 2}: 8}", "{{Key: 2}: 8}"},
 		//	wantRowsRead:    2,
 		//	wantErr:         false,
-		//},
-		//{
+		// },
+		// {
 		//	name:       "Should convert struct with struct tag, struct as key",
 		//	columnType: "LowCardinality(Map(Map(String, UInt8), UInt8))",
 		//	args: args{
@@ -376,8 +376,8 @@ func TestLowCardinalityColumnData_ReadFromValues(t *testing.T) {
 		//	wantDataWritten: []string{"{{key: 2}: 8}", "{{key: 2}: 8}"},
 		//	wantRowsRead:    2,
 		//	wantErr:         false,
-		//},
-		//{
+		// },
+		// {
 		//	name:       "Should throw error, no panic, if struct is unexported",
 		//	columnType: "LowCardinality(Map(Map(String, UInt8), UInt8))",
 		//	args: args{
@@ -386,8 +386,8 @@ func TestLowCardinalityColumnData_ReadFromValues(t *testing.T) {
 		//	wantDataWritten: []string{"{}"},
 		//	wantRowsRead:    0,
 		//	wantErr:         true,
-		//},
-		//{
+		// },
+		// {
 		//	name:       "Should throw error if invalid value, 2 rows",
 		//	columnType: "LowCardinality(Map(UInt8, UInt8))",
 		//	args: args{
@@ -396,8 +396,8 @@ func TestLowCardinalityColumnData_ReadFromValues(t *testing.T) {
 		//	wantDataWritten: []string{"{}"},
 		//	wantRowsRead:    0,
 		//	wantErr:         true,
-		//},
-		//{
+		// },
+		// {
 		//	name:       "Should throw error if invalid value, 2 rows",
 		//	columnType: "LowCardinality(Map(UInt8, UInt8))",
 		//	args: args{
@@ -406,8 +406,8 @@ func TestLowCardinalityColumnData_ReadFromValues(t *testing.T) {
 		//	wantDataWritten: []string{"{}"},
 		//	wantRowsRead:    0,
 		//	wantErr:         true,
-		//},
-		//{
+		// },
+		// {
 		//	name:       "Should throw error if invalid value, 2 rows",
 		//	columnType: "LowCardinality(Map(UInt8, UInt8))",
 		//	args: args{
@@ -420,8 +420,8 @@ func TestLowCardinalityColumnData_ReadFromValues(t *testing.T) {
 		//	wantDataWritten: []string{"{}"},
 		//	wantRowsRead:    1,
 		//	wantErr:         true,
-		//},
-		//{
+		// },
+		// {
 		//	name:       "Should throw error if invalid value, 2 rows",
 		//	columnType: "LowCardinality(Map(UInt8, UInt8))",
 		//	args: args{
@@ -442,8 +442,8 @@ func TestLowCardinalityColumnData_ReadFromValues(t *testing.T) {
 		//	wantDataWritten: []string{"{}"},
 		//	wantRowsRead:    1,
 		//	wantErr:         true,
-		//},
-		//{
+		// },
+		// {
 		//	name:       "Should throw error if invalid value, 2 rows",
 		//	columnType: "LowCardinality(Map(UInt8, LowCardinality(UInt8)))",
 		//	args: args{
@@ -462,7 +462,7 @@ func TestLowCardinalityColumnData_ReadFromValues(t *testing.T) {
 		//	wantDataWritten: []string{"{}"},
 		//	wantRowsRead:    2,
 		//	wantErr:         true,
-		//},
+		// },
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

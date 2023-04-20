@@ -6,7 +6,8 @@ import (
 )
 
 type NothingColumnData struct {
-	raw []byte
+	raw      []byte
+	isClosed bool
 }
 
 func (n *NothingColumnData) ReadFromValues(values []interface{}) (int, error) {
@@ -48,6 +49,10 @@ func (n *NothingColumnData) Len() int {
 }
 
 func (n *NothingColumnData) Close() error {
+	if n.isClosed {
+		return nil
+	}
+	n.isClosed = true
 	bytepool.PutBytes(n.raw)
 	return nil
 }

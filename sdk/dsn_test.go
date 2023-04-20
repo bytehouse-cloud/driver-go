@@ -3,9 +3,10 @@ package sdk
 import (
 	"fmt"
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/require"
+
+	"github.com/bytehouse-cloud/driver-go/driver/lib/settings"
 
 	"github.com/bytehouse-cloud/driver-go/conn"
 )
@@ -13,9 +14,9 @@ import (
 func TestParseDSN(t *testing.T) {
 	defaultLog := func(string2 string, args ...interface{}) {}
 	defaultOpts := []conn.OptionConfig{
-		conn.OptionReadTimeout(time.Minute),
-		conn.OptionWriteTimeout(time.Minute),
-		conn.OptionConnTimeout(3 * time.Second),
+		conn.OptionReceiveTimeout(settings.DBMS_DEFAULT_RECEIVE_TIMEOUT_SEC),
+		conn.OptionSendTimeout(settings.DBMS_DEFAULT_SEND_TIMEOUT_SEC),
+		conn.OptionConnTimeout(settings.DBMS_DEFAULT_CONNECT_TIMEOUT_SEC),
 		conn.OptionLogf(defaultLog),
 	}
 
@@ -119,7 +120,7 @@ func TestParseDSN(t *testing.T) {
 		{
 			name: "Can parse simple dsn with params",
 			args: args{
-				dsn: "user:password@protocol(address)/dbname?secure=true&write_timeout=100s&pool_size=2&target_account=10&replication_alter_columns_timeout=1&skip_history=true",
+				dsn: "user:password@protocol(address)/dbname?secure=true&send_timeout=100&pool_size=2&target_account=10&replication_alter_columns_timeout=1&skip_history=true",
 			},
 			want: &Config{
 				databaseName:   "",
@@ -132,8 +133,8 @@ func TestParseDSN(t *testing.T) {
 			},
 			wantOpts: []conn.OptionConfig{
 				conn.OptionHostName(":"),
-				conn.OptionWriteTimeout(100 * time.Second),
 				conn.OptionSecure(true),
+				conn.OptionSendTimeout(100),
 			},
 		},
 		{
@@ -206,7 +207,7 @@ func TestParseDSN(t *testing.T) {
 		{
 			name: "Can throw ioErr if invalid duration",
 			args: args{
-				dsn: "user:password@protocol(address)/dbname?secure=true&write_timeout=100&pool_size=2",
+				dsn: "user:password@protocol(address)/dbname?secure=true&send_timeout=2w2&pool_size=2",
 			},
 			wantErr: true,
 		},

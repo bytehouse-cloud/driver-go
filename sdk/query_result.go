@@ -2,6 +2,8 @@ package sdk
 
 import (
 	"io"
+	"log"
+	"runtime/debug"
 
 	"github.com/bytehouse-cloud/driver-go/driver/lib/data"
 	"github.com/bytehouse-cloud/driver-go/driver/lib/data/column"
@@ -9,13 +11,14 @@ import (
 )
 
 type QueryResult struct {
-	dataStream chan *response.DataPacket //todo: change to chan *data.Block
-	block      *data.Block
-	values     [][]interface{}
-	offset     int
-	columns    []*column.CHColumn // columns are to be used only for metadata consumption
-	err        error
-	resultMeta []response.Packet
+	dataStream   chan *response.DataPacket //todo: change to chan *data.Block
+	block        *data.Block
+	values       [][]interface{}
+	offset       int
+	columns      []*column.CHColumn // columns are to be used only for metadata consumption
+	err          error
+	resultMeta   []response.Packet
+	rowsInserted int
 }
 
 func NewInsertQueryResult(responses <-chan response.Packet) *QueryResult {
@@ -25,6 +28,13 @@ func NewInsertQueryResult(responses <-chan response.Packet) *QueryResult {
 	}
 
 	go func() {
+		defer func() {
+			if r := recover(); r != nil {
+				log.Printf("A runtime panic has occurred with err = [%s],  stacktrace = [%s]\n",
+					r,
+					string(debug.Stack()))
+			}
+		}()
 		defer close(qr.dataStream)
 
 		for resp := range responses {
@@ -49,6 +59,13 @@ func NewQueryResult(responses <-chan response.Packet, finish func()) *QueryResul
 	waitReady(responses, qr)
 
 	go func() {
+		defer func() {
+			if r := recover(); r != nil {
+				log.Printf("A runtime panic has occurred with err = [%s],  stacktrace = [%s]\n",
+					r,
+					string(debug.Stack()))
+			}
+		}()
 		defer finish()
 		defer close(qr.dataStream)
 
@@ -137,6 +154,17 @@ func (q *QueryResult) NextRow() ([]interface{}, bool) {
 	return q.getNextRowFromBuffer(), true
 }
 
+func (q *QueryResult) NextRowAsString() ([]interface{}, bool) {
+	if len(q.values) == q.offset {
+		d := <-q.dataStream
+		if d == nil {
+			return nil, false
+		}
+		q.readBlockDataInStrings(d.Block)
+	}
+	return q.getNextRowFromBuffer(), true
+}
+
 func (q *QueryResult) getNextRowFromBuffer() []interface{} {
 	row := q.values[q.offset]
 	q.offset++
@@ -146,6 +174,18 @@ func (q *QueryResult) getNextRowFromBuffer() []interface{} {
 func (q *QueryResult) readBlockData(block *data.Block) {
 	q.prepareValues(block)
 	block.WriteToValues(q.values)
+	q.offset = 0
+	if q.block == nil {
+		q.block = block
+		return
+	}
+	_ = q.block.Close()
+	q.block = block
+}
+
+func (q *QueryResult) readBlockDataInStrings(block *data.Block) {
+	q.prepareValues(block)
+	block.WriteValuesAsString(q.values)
 	q.offset = 0
 	if q.block == nil {
 		q.block = block
@@ -195,6 +235,13 @@ func extractBlockStream(dataRespStream <-chan *response.DataPacket) <-chan *data
 	blockStream := make(chan *data.Block, 1)
 
 	go func() {
+		defer func() {
+			if r := recover(); r != nil {
+				log.Printf("A runtime panic has occurred with err = [%s],  stacktrace = [%s]\n",
+					r,
+					string(debug.Stack()))
+			}
+		}()
 		defer close(blockStream)
 		for r := range dataRespStream {
 			blockStream <- r.Block

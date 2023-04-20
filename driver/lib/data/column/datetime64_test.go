@@ -25,26 +25,27 @@ func TestDateTime64ColumnData_ReadFromTexts(t *testing.T) {
 		{
 			name: "Should write data and return number of rows read with no error",
 			args: args{
-				texts: []string{"1950-01-02 15:04:05", "2020-01-02 15:04:05", "2019-01-01 00:00:00"},
+				texts: []string{"1950-01-02 15:04:05.000", "2020-01-02 15:04:05.000", "2019-01-01 00:00:00.000"},
 			},
-			wantRowsRead: 3,
-			wantErr:      false,
+			wantDataWritten: []string{"1950-01-02 15:04:05.000", "2020-01-02 15:04:05.000", "2019-01-01 00:00:00.000"},
+			wantRowsRead:    3,
+			wantErr:         false,
 		},
 		{
-			name: "Given inconsistent format then throw error",
+			name: "Given different format then no error",
 			args: args{
 				texts: []string{"1950-01-02", "2020-01-02 15:04:05", "2020-01-02 15:04:05.322"},
 			},
-			wantDataWritten: []string{"1950-01-02 00:00:00", "2020-01-02 15:04:05", "2020-01-02 15:04:05.322"},
+			wantDataWritten: []string{"1950-01-02 00:00:00.000", "2020-01-02 15:04:05.000", "2020-01-02 15:04:05.322"},
 			wantRowsRead:    3,
-			wantErr:         true,
+			wantErr:         false,
 		},
 		{
 			name: "Should write data and return number of rows read with no error, empty string",
 			args: args{
-				texts: []string{"", "1950-01-02 15:04:05", "2020-01-02 15:04:05"},
+				texts: []string{"", "1950-01-02 15:04:05.000", "2020-01-02 15:04:05.000"},
 			},
-			wantDataWritten: []string{zeroTime.String()[:19], "1950-01-02 15:04:05", "2020-01-02 15:04:05"},
+			wantDataWritten: []string{"1970-01-01 00:00:00.000", "1950-01-02 15:04:05.000", "2020-01-02 15:04:05.000"},
 			wantRowsRead:    3,
 			wantErr:         false,
 		},
@@ -59,7 +60,7 @@ func TestDateTime64ColumnData_ReadFromTexts(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			i := MustMakeColumnData("DateTime64(6)", 1000)
+			i := MustMakeColumnData("DateTime64(3)", 1000)
 
 			got, err := i.ReadFromTexts(tt.args.texts)
 			if tt.wantErr {
@@ -150,26 +151,26 @@ func TestDateTime64ColumnData_EncoderDecoder(t *testing.T) {
 		{
 			name: "Should write data and return number of rows read with no error",
 			args: args{
-				texts: []string{"1950-01-02 15:04:05", "2020-01-02 15:04:05", "2019-01-01 00:00:00"},
+				texts: []string{"1950-01-02 15:04:05.000", "2020-01-02 15:04:05.000", "2019-01-01 00:00:00.000"},
 			},
 			wantRowsRead: 3,
 			wantErr:      false,
 		},
 		{
-			name: "Given inconsistent format then throw error",
+			name: "Given different format then no error",
 			args: args{
 				texts: []string{"1950-01-02", "2020-01-02 15:04:05", "2020-01-02 15:04:05.322"},
 			},
-			wantDataWritten: []string{"1950-01-02 00:00:00", "2020-01-02 15:04:05", "2020-01-02 15:04:05.322"},
+			wantDataWritten: []string{"1950-01-02 00:00:00.000", "2020-01-02 15:04:05.000", "2020-01-02 15:04:05.322"},
 			wantRowsRead:    3,
-			wantErr:         true,
+			wantErr:         false,
 		},
 		{
 			name: "Should write data and return number of rows read with no error, empty string",
 			args: args{
-				texts: []string{"", "1950-01-02 15:04:05", "2020-01-02 15:04:05"},
+				texts: []string{"", "1950-01-02 15:04:05.000", "2020-01-02 15:04:05.000"},
 			},
-			wantDataWritten: []string{zeroTime.String()[:19], "1950-01-02 15:04:05", "2020-01-02 15:04:05"},
+			wantDataWritten: []string{"1970-01-01 00:00:00.000", "1950-01-02 15:04:05.000", "2020-01-02 15:04:05.000"},
 			wantRowsRead:    3,
 			wantErr:         false,
 		},
@@ -181,7 +182,7 @@ func TestDateTime64ColumnData_EncoderDecoder(t *testing.T) {
 			decoder := ch_encoding.NewDecoder(&buffer)
 
 			// Write to encoder
-			original := MustMakeColumnData("DateTime64(6)", len(tt.args.texts))
+			original := MustMakeColumnData("DateTime64(3)", len(tt.args.texts))
 			got, err := original.ReadFromTexts(tt.args.texts)
 			if tt.wantErr {
 				require.Error(t, err)
@@ -194,7 +195,7 @@ func TestDateTime64ColumnData_EncoderDecoder(t *testing.T) {
 			require.NoError(t, err)
 
 			// Read from decoder
-			newCopy := MustMakeColumnData("DateTime64(6)", len(tt.args.texts))
+			newCopy := MustMakeColumnData("DateTime64(3)", len(tt.args.texts))
 			err = newCopy.ReadFromDecoder(decoder)
 
 			for index, value := range tt.wantDataWritten {

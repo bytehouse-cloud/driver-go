@@ -10,8 +10,11 @@ import (
 
 type QueryContext struct {
 	context.Context
-	querySettings  map[string]interface{}
-	clientSettings map[string]interface{}
+	querySettings         map[string]interface{}
+	clientSettings        map[string]interface{}
+	persistentConnConfigs map[string]interface{}
+	temporaryConnConfigs  map[string]interface{}
+	queryID               string
 }
 
 // NewQueryContext initialize a context that can be passed when querying.
@@ -27,9 +30,11 @@ func NewQueryContext(ctx context.Context) *QueryContext {
 		return qc
 	}
 	return &QueryContext{
-		Context:        ctx,
-		querySettings:  make(map[string]interface{}),
-		clientSettings: make(map[string]interface{}),
+		Context:               ctx,
+		querySettings:         make(map[string]interface{}),
+		clientSettings:        make(map[string]interface{}),
+		persistentConnConfigs: make(map[string]interface{}),
+		temporaryConnConfigs:  make(map[string]interface{}),
 	}
 }
 
@@ -59,6 +64,32 @@ func (q *QueryContext) AddClientSetting(name string, value interface{}) error {
 
 func (q *QueryContext) GetClientSettings() map[string]interface{} {
 	return q.clientSettings
+}
+
+func (q *QueryContext) AddPersistentConnConfigs(name string, value interface{}) error {
+	q.persistentConnConfigs[name] = value
+	return nil
+}
+
+func (q *QueryContext) GetPersistentConnConfigs() map[string]interface{} {
+	return q.persistentConnConfigs
+}
+
+func (q *QueryContext) AddTemporaryConnConfigs(name string, value interface{}) error {
+	q.temporaryConnConfigs[name] = value
+	return nil
+}
+
+func (q *QueryContext) GetTemporaryConnConfigs() map[string]interface{} {
+	return q.temporaryConnConfigs
+}
+
+func (q *QueryContext) GetQueryID() string {
+	return q.queryID
+}
+
+func (q *QueryContext) SetQueryID(id string) {
+	q.queryID = id
 }
 
 func clientSettingToValue(name string, value interface{}) (interface{}, error) {

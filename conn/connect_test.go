@@ -1,6 +1,7 @@
 package conn
 
 import (
+	"bufio"
 	"io"
 	"testing"
 
@@ -51,12 +52,12 @@ func TestConn(t *testing.T) {
 			name: "Can return eof error at the end of read",
 			test: func(t *testing.T) {
 				conn := &connect{
-					Conn:         fConn,
-					logf:         func(s string, i ...interface{}) {},
-					ident:        1,
-					zReader:      bytepool.NewZReader(fConn, 1024*4, 8),
-					readTimeout:  1000,
-					writeTimeout: 1000,
+					Conn:           fConn,
+					logf:           func(s string, i ...interface{}) {},
+					ident:          1,
+					zReader:        bytepool.NewZReader(fConn, 1024*4, 8),
+					receiveTimeout: 1000,
+					sendTimeout:    1000,
 				}
 				v := make([]byte, 100)
 				_, err := conn.Read(v)
@@ -68,12 +69,12 @@ func TestConn(t *testing.T) {
 			name: "Can return eof error at the end of read",
 			test: func(t *testing.T) {
 				conn := &connect{
-					Conn:         fConn,
-					logf:         func(s string, i ...interface{}) {},
-					ident:        1,
-					zReader:      bytepool.NewZReader(fConn, 1024*4, 8),
-					readTimeout:  1000,
-					writeTimeout: 1000,
+					Conn:           fConn,
+					logf:           func(s string, i ...interface{}) {},
+					ident:          1,
+					zReader:        bytepool.NewZReader(fConn, 1024*4, 8),
+					receiveTimeout: 1000,
+					sendTimeout:    1000,
 				}
 				_, err := conn.ReadUvarint()
 				require.Equal(t, err, io.EOF)
@@ -84,14 +85,16 @@ func TestConn(t *testing.T) {
 			name: "Can return error if write fails",
 			test: func(t *testing.T) {
 				conn := &connect{
-					Conn:         fConn,
-					logf:         func(s string, i ...interface{}) {},
-					ident:        1,
-					zReader:      bytepool.NewZReader(fConn, 1024*4, 8),
-					readTimeout:  1000,
-					writeTimeout: 1000,
+					Conn:           fConn,
+					logf:           func(s string, i ...interface{}) {},
+					ident:          1,
+					zReader:        bytepool.NewZReader(fConn, 1024*4, 8),
+					bWriter:        bufio.NewWriter(fConn),
+					receiveTimeout: 1000,
+					sendTimeout:    1000,
 				}
-				_, err := conn.Write([]byte("hello"))
+				conn.Write([]byte("hello"))
+				err := conn.Flush()
 				require.Error(t, err)
 				require.Equal(t, "fakeConn: can't write anything other than dinosaur", err.Error())
 				require.NoError(t, conn.Close())
@@ -101,15 +104,17 @@ func TestConn(t *testing.T) {
 			name: "Can write with right length of bytes written",
 			test: func(t *testing.T) {
 				conn := &connect{
-					Conn:         fConn,
-					logf:         func(s string, i ...interface{}) {},
-					ident:        1,
-					zReader:      bytepool.NewZReader(fConn, 1024*4, 8),
-					readTimeout:  1000,
-					writeTimeout: 1000,
+					Conn:           fConn,
+					logf:           func(s string, i ...interface{}) {},
+					ident:          1,
+					zReader:        bytepool.NewZReader(fConn, 1024*4, 8),
+					bWriter:        bufio.NewWriter(fConn),
+					receiveTimeout: 1000,
+					sendTimeout:    1000,
 				}
 				data := []byte("dinosaur")
-				n, err := conn.Write(data)
+				n, _ := conn.Write(data)
+				err := conn.Flush()
 				require.NoError(t, err)
 				require.Equal(t, len(data), n)
 				require.NoError(t, conn.Close())

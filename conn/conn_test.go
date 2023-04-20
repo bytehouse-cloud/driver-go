@@ -8,6 +8,8 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/bytehouse-cloud/driver-go/driver/lib/bytepool/mocks"
+
 	"github.com/bytehouse-cloud/driver-go/driver/lib/ch_encoding"
 	"github.com/bytehouse-cloud/driver-go/driver/lib/data"
 	"github.com/bytehouse-cloud/driver-go/driver/protocol"
@@ -132,7 +134,7 @@ func TestGatewayConn_EncoderDecoder(t *testing.T) {
 				g := &GatewayConn{
 					encoder:     encoder,
 					decoder:     decoder,
-					connOptions: conf,
+					connConfigs: conf,
 					conn: &connect{
 						Conn: &fakeConn{},
 					},
@@ -155,7 +157,7 @@ func TestGatewayConn_EncoderDecoder(t *testing.T) {
 				g := &GatewayConn{
 					encoder:     encoder,
 					decoder:     decoder,
-					connOptions: conf,
+					connConfigs: conf,
 					conn: &connect{
 						Conn: &fakeConn{},
 					},
@@ -177,7 +179,7 @@ func TestGatewayConn_EncoderDecoder(t *testing.T) {
 				g := &GatewayConn{
 					encoder:     encoder,
 					decoder:     decoder,
-					connOptions: conf,
+					connConfigs: conf,
 					conn: &connect{
 						Conn: &fakeConn{},
 					},
@@ -209,7 +211,7 @@ func TestGatewayConn_EncoderDecoder(t *testing.T) {
 				g := &GatewayConn{
 					encoder:     encoder,
 					decoder:     decoder,
-					connOptions: conf,
+					connConfigs: conf,
 					conn: &connect{
 						Conn: &fakeConn{},
 					},
@@ -234,7 +236,7 @@ func TestGatewayConn_EncoderDecoder(t *testing.T) {
 				g := &GatewayConn{
 					encoder:     encoder,
 					decoder:     decoder,
-					connOptions: conf,
+					connConfigs: conf,
 					conn: &connect{
 						Conn: &fakeConn{},
 					},
@@ -260,7 +262,7 @@ func TestGatewayConn_EncoderDecoder(t *testing.T) {
 				g := &GatewayConn{
 					encoder:     encoder,
 					decoder:     decoder,
-					connOptions: conf,
+					connConfigs: conf,
 					conn: &connect{
 						Conn: &fakeConn{},
 					},
@@ -286,7 +288,7 @@ func TestGatewayConn_EncoderDecoder(t *testing.T) {
 				g := &GatewayConn{
 					encoder:     encoder,
 					decoder:     decoder,
-					connOptions: config,
+					connConfigs: config,
 					conn: &connect{
 						Conn: &fakeConn{},
 					},
@@ -308,9 +310,10 @@ func TestGatewayConn_EncoderDecoder(t *testing.T) {
 				g := &GatewayConn{
 					encoder:     encoder,
 					decoder:     decoder,
-					connOptions: newConf,
+					connConfigs: newConf,
 					conn: &connect{
-						Conn: &fakeConn{},
+						Conn:    &fakeConn{},
+						zReader: mocks.NewFakedZReader(),
 					},
 					authentication: NewPasswordAuthentication("u", "p"),
 				}
@@ -332,7 +335,7 @@ func TestGatewayConn_EncoderDecoder(t *testing.T) {
 				g := &GatewayConn{
 					encoder:     encoder,
 					decoder:     decoder,
-					connOptions: conf,
+					connConfigs: conf,
 					conn: &connect{
 						Conn: &fakeConn{},
 					},
@@ -357,7 +360,7 @@ func TestGatewayConn_EncoderDecoder(t *testing.T) {
 				g := &GatewayConn{
 					encoder:     encoder,
 					decoder:     decoder,
-					connOptions: newConf,
+					connConfigs: newConf,
 					conn: &connect{
 						Conn: &fakeConn{},
 					},

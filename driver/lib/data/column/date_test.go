@@ -23,12 +23,310 @@ func TestDateColumnData_ReadFromTexts(t *testing.T) {
 		wantErr         bool
 	}{
 		{
-			name: "Should write data and return number of rows read with no error",
+			name: "Should write data in yyyy-MM-dd format and return number of rows read with no error",
 			args: args{
 				texts: []string{"1970-01-02", "2020-01-02", "2019-01-01"},
 			},
 			wantRowsRead: 3,
 			wantErr:      false,
+		},
+		{
+			name: "Should write data in yyyy-M-d format and return number of rows read with no error",
+			args: args{
+				texts: []string{"1970-1-2", "2020-1-20", "2019-12-1"},
+			},
+			wantDataWritten: []string{"1970-01-02", "2020-01-20", "2019-12-01"},
+			wantRowsRead:    3,
+			wantErr:         false,
+		},
+		{
+			name: "Should write data in dd-MM-yyyy format and return number of rows read with no error",
+			args: args{
+				texts: []string{"02-01-1970", "20-01-2020", "01-12-2019"},
+			},
+			wantDataWritten: []string{"1970-01-02", "2020-01-20", "2019-12-01"},
+			wantRowsRead:    3,
+			wantErr:         false,
+		},
+		{
+			name: "Should write data in d-M-yyyy format and return number of rows read with no error",
+			args: args{
+				texts: []string{"2-1-1970", "20-1-2020", "1-12-2019"},
+			},
+			wantDataWritten: []string{"1970-01-02", "2020-01-20", "2019-12-01"},
+			wantRowsRead:    3,
+			wantErr:         false,
+		},
+		{
+			name: "Should write data in yyyy/MM/dd format and return number of rows read with no error",
+			args: args{
+				texts: []string{"1970/01/02", "2020/01/20", "2019/12/01"},
+			},
+			wantDataWritten: []string{"1970-01-02", "2020-01-20", "2019-12-01"},
+			wantRowsRead:    3,
+			wantErr:         false,
+		},
+		{
+			name: "Should write data in yyyy/M/d format and return number of rows read with no error",
+			args: args{
+				texts: []string{"1970/1/2", "2020/1/20", "2019/12/1"},
+			},
+			wantDataWritten: []string{"1970-01-02", "2020-01-20", "2019-12-01"},
+			wantRowsRead:    3,
+			wantErr:         false,
+		},
+		{
+			name: "Should write data in dd/MM/yyyy format and return number of rows read with no error",
+			args: args{
+				texts: []string{"02/01/1970", "20/01/2020", "01/12/2019"},
+			},
+			wantDataWritten: []string{"1970-01-02", "2020-01-20", "2019-12-01"},
+			wantRowsRead:    3,
+			wantErr:         false,
+		},
+		{
+			name: "Should write data in d/M/yyyy format and return number of rows read with no error",
+			args: args{
+				texts: []string{"2/1/1970", "20/1/2020", "1/12/2019"},
+			},
+			wantDataWritten: []string{"1970-01-02", "2020-01-20", "2019-12-01"},
+			wantRowsRead:    3,
+			wantErr:         false,
+		},
+		{
+			name: "Should write data in yyyy-Mon-dd format and return number of rows read with no error",
+			args: args{
+				texts: []string{"1970-Jan-02", "2020-jan-20", "2019-DEC-01"},
+			},
+			wantDataWritten: []string{"1970-01-02", "2020-01-20", "2019-12-01"},
+			wantRowsRead:    3,
+			wantErr:         false,
+		},
+		{
+			name: "Should write data in yyyy-Mon-d format and return number of rows read with no error",
+			args: args{
+				texts: []string{"1970-Jan-2", "2020-jan-20", "2019-DEC-1"},
+			},
+			wantDataWritten: []string{"1970-01-02", "2020-01-20", "2019-12-01"},
+			wantRowsRead:    3,
+			wantErr:         false,
+		},
+		{
+			name: "Should write data in dd-Mon-yyyy format and return number of rows read with no error",
+			args: args{
+				texts: []string{"02-Jan-1970", "20-jan-2020", "01-DEC-2019"},
+			},
+			wantDataWritten: []string{"1970-01-02", "2020-01-20", "2019-12-01"},
+			wantRowsRead:    3,
+			wantErr:         false,
+		},
+		{
+			name: "Should write data in d-Mon-yyyy format and return number of rows read with no error",
+			args: args{
+				texts: []string{"2-Jan-1970", "20-jan-2020", "1-DEC-2019"},
+			},
+			wantDataWritten: []string{"1970-01-02", "2020-01-20", "2019-12-01"},
+			wantRowsRead:    3,
+			wantErr:         false,
+		},
+		{
+			name: "Should write data in Mon-dd-yyyy format and return number of rows read with no error",
+			args: args{
+				texts: []string{"Jan-02-1970", "jan-20-2020", "DEC-01-2019"},
+			},
+			wantDataWritten: []string{"1970-01-02", "2020-01-20", "2019-12-01"},
+			wantRowsRead:    3,
+			wantErr:         false,
+		},
+		{
+			name: "Should write data in Mon-d-yyyy format and return number of rows read with no error",
+			args: args{
+				texts: []string{"Jan-2-1970", "jan-20-2020", "DEC-1-2019"},
+			},
+			wantDataWritten: []string{"1970-01-02", "2020-01-20", "2019-12-01"},
+			wantRowsRead:    3,
+			wantErr:         false,
+		},
+		{
+			name: "Should write data in yyyy/Mon/dd format and return number of rows read with no error",
+			args: args{
+				texts: []string{"1970/Jan/02", "2020/jan/20", "2019/DEC/01"},
+			},
+			wantDataWritten: []string{"1970-01-02", "2020-01-20", "2019-12-01"},
+			wantRowsRead:    3,
+			wantErr:         false,
+		},
+		{
+			name: "Should write data in yyyy/Mon/d format and return number of rows read with no error",
+			args: args{
+				texts: []string{"1970/Jan/2", "2020/jan/20", "2019/DEC/1"},
+			},
+			wantDataWritten: []string{"1970-01-02", "2020-01-20", "2019-12-01"},
+			wantRowsRead:    3,
+			wantErr:         false,
+		},
+		{
+			name: "Should write data in dd/Mon/yyyy format and return number of rows read with no error",
+			args: args{
+				texts: []string{"02/Jan/1970", "20/jan/2020", "01/DEC/2019"},
+			},
+			wantDataWritten: []string{"1970-01-02", "2020-01-20", "2019-12-01"},
+			wantRowsRead:    3,
+			wantErr:         false,
+		},
+		{
+			name: "Should write data in d/Mon/yyyy format and return number of rows read with no error",
+			args: args{
+				texts: []string{"2/Jan/1970", "20/jan/2020", "1/DEC/2019"},
+			},
+			wantDataWritten: []string{"1970-01-02", "2020-01-20", "2019-12-01"},
+			wantRowsRead:    3,
+			wantErr:         false,
+		},
+		{
+			name: "Should write data in Mon/dd/yyyy format and return number of rows read with no error",
+			args: args{
+				texts: []string{"Jan/02/1970", "jan/20/2020", "DEC/01/2019"},
+			},
+			wantDataWritten: []string{"1970-01-02", "2020-01-20", "2019-12-01"},
+			wantRowsRead:    3,
+			wantErr:         false,
+		},
+		{
+			name: "Should write data in Mon/d/yyyy format and return number of rows read with no error",
+			args: args{
+				texts: []string{"Jan/2/1970", "jan/20/2020", "DEC/1/2019"},
+			},
+			wantDataWritten: []string{"1970-01-02", "2020-01-20", "2019-12-01"},
+			wantRowsRead:    3,
+			wantErr:         false,
+		},
+
+		{
+			name: "Should write data in yyyy-Month-dd format and return number of rows read with no error",
+			args: args{
+				texts: []string{"1970-January-02", "2020-january-20", "2019-DECEMBER-01"},
+			},
+			wantDataWritten: []string{"1970-01-02", "2020-01-20", "2019-12-01"},
+			wantRowsRead:    3,
+			wantErr:         false,
+		},
+		{
+			name: "Should write data in yyyy-Month-d format and return number of rows read with no error",
+			args: args{
+				texts: []string{"1970-January-2", "2020-january-20", "2019-DECEMBER-1"},
+			},
+			wantDataWritten: []string{"1970-01-02", "2020-01-20", "2019-12-01"},
+			wantRowsRead:    3,
+			wantErr:         false,
+		},
+		{
+			name: "Should write data in dd-Month-yyyy format and return number of rows read with no error",
+			args: args{
+				texts: []string{"02-January-1970", "20-january-2020", "01-DECEMBER-2019"},
+			},
+			wantDataWritten: []string{"1970-01-02", "2020-01-20", "2019-12-01"},
+			wantRowsRead:    3,
+			wantErr:         false,
+		},
+		{
+			name: "Should write data in d-Month-yyyy format and return number of rows read with no error",
+			args: args{
+				texts: []string{"2-January-1970", "20-january-2020", "1-DECEMBER-2019"},
+			},
+			wantDataWritten: []string{"1970-01-02", "2020-01-20", "2019-12-01"},
+			wantRowsRead:    3,
+			wantErr:         false,
+		},
+		{
+			name: "Should write data in Month-dd-yyyy format and return number of rows read with no error",
+			args: args{
+				texts: []string{"January-02-1970", "january-20-2020", "DECEMBER-01-2019"},
+			},
+			wantDataWritten: []string{"1970-01-02", "2020-01-20", "2019-12-01"},
+			wantRowsRead:    3,
+			wantErr:         false,
+		},
+		{
+			name: "Should write data in Month-d-yyyy format and return number of rows read with no error",
+			args: args{
+				texts: []string{"January-2-1970", "january-20-2020", "DECEMBER-1-2019"},
+			},
+			wantDataWritten: []string{"1970-01-02", "2020-01-20", "2019-12-01"},
+			wantRowsRead:    3,
+			wantErr:         false,
+		},
+		{
+			name: "Should write data in yyyy/Month/dd format and return number of rows read with no error",
+			args: args{
+				texts: []string{"1970/January/02", "2020/january/20", "2019/DECEMBER/01"},
+			},
+			wantDataWritten: []string{"1970-01-02", "2020-01-20", "2019-12-01"},
+			wantRowsRead:    3,
+			wantErr:         false,
+		},
+		{
+			name: "Should write data in yyyy/Month/d format and return number of rows read with no error",
+			args: args{
+				texts: []string{"1970/January/2", "2020/january/20", "2019/DECEMBER/1"},
+			},
+			wantDataWritten: []string{"1970-01-02", "2020-01-20", "2019-12-01"},
+			wantRowsRead:    3,
+			wantErr:         false,
+		},
+		{
+			name: "Should write data in dd/Month/yyyy format and return number of rows read with no error",
+			args: args{
+				texts: []string{"02/January/1970", "20/january/2020", "01/DECEMBER/2019"},
+			},
+			wantDataWritten: []string{"1970-01-02", "2020-01-20", "2019-12-01"},
+			wantRowsRead:    3,
+			wantErr:         false,
+		},
+		{
+			name: "Should write data in d/Month/yyyy format and return number of rows read with no error",
+			args: args{
+				texts: []string{"2/January/1970", "20/january/2020", "1/DECEMBER/2019"},
+			},
+			wantDataWritten: []string{"1970-01-02", "2020-01-20", "2019-12-01"},
+			wantRowsRead:    3,
+			wantErr:         false,
+		},
+		{
+			name: "Should write data in Month/dd/yyyy format and return number of rows read with no error",
+			args: args{
+				texts: []string{"January/02/1970", "january/20/2020", "DECEMBER/01/2019"},
+			},
+			wantDataWritten: []string{"1970-01-02", "2020-01-20", "2019-12-01"},
+			wantRowsRead:    3,
+			wantErr:         false,
+		},
+		{
+			name: "Should write data in Month/d/yyyy format and return number of rows read with no error",
+			args: args{
+				texts: []string{"January/2/1970", "january/20/2020", "DECEMBER/1/2019"},
+			},
+			wantDataWritten: []string{"1970-01-02", "2020-01-20", "2019-12-01"},
+			wantRowsRead:    3,
+			wantErr:         false,
+		},
+		{
+			name: "Should write data in yyyyMMdd format and return number of rows read with no error",
+			args: args{
+				texts: []string{"19700102", "20200120", "20191201"},
+			},
+			wantDataWritten: []string{"1970-01-02", "2020-01-20", "2019-12-01"},
+			wantRowsRead:    3,
+			wantErr:         false,
+		},
+		{
+			name: "Should write data in ddMMyyyy format and return number of rows read with no error",
+			args: args{
+				texts: []string{"02011970", "20012020", "01122019"},
+			},
+			wantDataWritten: []string{"1970-01-02", "2020-01-20", "2019-12-01"},
+			wantRowsRead:    3,
+			wantErr:         false,
 		},
 		{
 			name: "Given inconsistent format then throw error",
@@ -54,6 +352,22 @@ func TestDateColumnData_ReadFromTexts(t *testing.T) {
 				texts: []string{"1970-01-02", "2020-01-02pp"},
 			},
 			wantRowsRead: 1,
+			wantErr:      true,
+		},
+		{
+			name: "Should throw error if date is earlier than 1970-01-01",
+			args: args{
+				texts: []string{"1900-01-01", "1970-01-02"},
+			},
+			wantRowsRead: 0,
+			wantErr:      true,
+		},
+		{
+			name: "Should throw error if date is later than 2149-06-06",
+			args: args{
+				texts: []string{"1970-01-01", "2022-08-14", "2149-06-07"},
+			},
+			wantRowsRead: 2,
 			wantErr:      true,
 		},
 	}

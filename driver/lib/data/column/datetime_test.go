@@ -16,37 +16,47 @@ func TestDateTimeColumnData_ReadFromTexts(t *testing.T) {
 		texts []string
 	}
 	tests := []struct {
-		name            string
-		args            args
-		wantDataWritten []string
-		wantRowsRead    int
-		wantErr         bool
+		name                          string
+		args                          args
+		wantDataWrittenInOutputFormat []string
+		wantRowsRead                  int
+		wantErr                       bool
 	}{
 		{
-			name: "Should write data and return number of rows read with no error, 1 row",
+			name: "Should write data in yyyy-MM-dd HH:mm:ss format and return number of rows read with no error, 1 row",
 			args: args{
 				texts: []string{"1970-01-02 15:04:05", "2020-01-02 15:04:05", "2019-01-01 00:00:00"},
 			},
-			wantRowsRead: 3,
-			wantErr:      false,
+			wantDataWrittenInOutputFormat: []string{"1970-01-02 15:04:05", "2020-01-02 15:04:05", "2019-01-01 00:00:00"},
+			wantRowsRead:                  3,
+			wantErr:                       false,
+		},
+		{
+			name: "Should write data in yyyy-MM-dd HH:mm:ss format with 1-9 decimal points and return number of rows read with no error, 1 row",
+			args: args{
+				texts: []string{"1970-01-02 15:04:05.1", "2020-01-02 15:04:05.123456", "2019-01-01 00:00:00.123456789"},
+			},
+			wantDataWrittenInOutputFormat: []string{"1970-01-02 15:04:05", "2020-01-02 15:04:05", "2019-01-01 00:00:00"},
+			wantRowsRead:                  3,
+			wantErr:                       false,
 		},
 		{
 			name: "give inconsistent format then throw error",
 			args: args{
 				texts: []string{"1970-01-02", "2020-01-02", "2020-01-02 15:04:05"},
 			},
-			wantDataWritten: []string{"1970-01-02 00:00:00", "2020-01-02 00:00:00", "2020-01-02 15:04:05"},
-			wantRowsRead:    3,
-			wantErr:         true,
+			wantDataWrittenInOutputFormat: []string{"1970-01-02 00:00:00", "2020-01-02 00:00:00", "2020-01-02 15:04:05"},
+			wantRowsRead:                  3,
+			wantErr:                       true,
 		},
 		{
 			name: "Should write data and return number of rows read with no error if empty string",
 			args: args{
 				texts: []string{"", "1970-01-02 15:04:05", "2020-01-02 15:04:05"},
 			},
-			wantDataWritten: []string{zeroTime.String()[:19], "1970-01-02 15:04:05", "2020-01-02 15:04:05"},
-			wantRowsRead:    3,
-			wantErr:         false,
+			wantDataWrittenInOutputFormat: []string{zeroTime.String()[:19], "1970-01-02 15:04:05", "2020-01-02 15:04:05"},
+			wantRowsRead:                  3,
+			wantErr:                       false,
 		},
 		{
 			name: "Should throw error if invalid time format",
@@ -54,6 +64,22 @@ func TestDateTimeColumnData_ReadFromTexts(t *testing.T) {
 				texts: []string{"1970-01-02 15:04:05", "2020-01-02pp 15:04:05"},
 			},
 			wantRowsRead: 1,
+			wantErr:      true,
+		},
+		{
+			name: "Should throw error if time is earlier than 1970-01-01 00:00:00",
+			args: args{
+				texts: []string{"1969-01-01 00:00:00", "1970-01-02 00:00:00"},
+			},
+			wantRowsRead: 0,
+			wantErr:      true,
+		},
+		{
+			name: "Should throw error if time is later than 2106-02-07 06:28:15",
+			args: args{
+				texts: []string{"1970-01-01 00:00:01", "2022-08-14 00:00:00", "2106-02-07 06:28:16"},
+			},
+			wantRowsRead: 2,
 			wantErr:      true,
 		},
 	}
@@ -71,8 +97,8 @@ func TestDateTimeColumnData_ReadFromTexts(t *testing.T) {
 				t.Errorf("ReadFromTexts() got = %v, wantRowsRead %v", got, tt.wantRowsRead)
 			}
 
-			if len(tt.wantDataWritten) > 0 {
-				for index, value := range tt.wantDataWritten {
+			if len(tt.wantDataWrittenInOutputFormat) > 0 {
+				for index, value := range tt.wantDataWrittenInOutputFormat {
 					if !tt.wantErr {
 						assert.Equal(t, value, i.GetString(index))
 					}

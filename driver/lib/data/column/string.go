@@ -10,8 +10,9 @@ import (
 const initialBufferLen = 4096
 
 type StringColumnData struct {
-	buf [][]byte
-	raw [][]byte
+	buf      [][]byte
+	raw      [][]byte
+	isClosed bool
 }
 
 func (s *StringColumnData) ReadFromDecoder(decoder *ch_encoding.Decoder) error {
@@ -105,6 +106,10 @@ func (s *StringColumnData) Len() int {
 }
 
 func (s *StringColumnData) Close() error {
+	if s.isClosed {
+		return nil
+	}
+	s.isClosed = true
 	for _, b := range s.buf {
 		bytepool.PutBytes(b)
 	}

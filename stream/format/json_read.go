@@ -124,9 +124,9 @@ func (j *JSONBlockStreamFmtReader) readElem(w helper.Writer, col *column.CHColum
 
 func (j *JSONBlockStreamFmtReader) readElemUnquoted(w helper.Writer, col *column.CHColumn, last bool) error {
 	if last {
-		return helper.ReadCHElemTillStop(w, j.zReader, col, '}')
+		return helper.ReadCHElemTillStop(w, j.zReader, col.Data, '}')
 	}
-	return helper.ReadCHElemTillStop(w, j.zReader, col, ',')
+	return helper.ReadCHElemTillStop(w, j.zReader, col.Data, ',')
 }
 
 func (j *JSONBlockStreamFmtReader) ReadFirstColumnTexts(fb *bytepool.FrameBuffer, numRows int, cols []*column.CHColumn) (int, error) {
@@ -239,7 +239,8 @@ func (j *JSONBlockStreamFmtReader) readStringUntilQuote(fb *bytepool.FrameBuffer
 // 2. Have meta field e.g. {"meta": [.................], "data": [...]}
 // Either ways it will skip to the first square brace in the data field
 // e.g. {..., "data": [...]}
-//                    ^ here
+//
+//	^ here
 func (j *JSONBlockStreamFmtReader) skipMeta() error {
 	// the second encountered [ denotes the start of data
 	var countRead int

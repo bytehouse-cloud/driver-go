@@ -8,6 +8,8 @@ import (
 const (
 	service = "bytehouse"
 	request = "request"
+
+	apiTokenAuthUsername = "bytehouse"
 )
 
 type Authentication interface {
@@ -64,4 +66,30 @@ func (s *SystemAuthentication) WriteAuthData(encoder *ch_encoding.Encoder) error
 
 func (s *SystemAuthentication) Identity() string {
 	return s.token
+}
+
+type APITokenAuthentication struct {
+	token string
+}
+
+func NewAPITokenAuthentication(token string) *APITokenAuthentication {
+	return &APITokenAuthentication{
+		token: token,
+	}
+}
+
+func (a *APITokenAuthentication) WriteAuthProtocol(encoder *ch_encoding.Encoder) error {
+	return encoder.Uvarint(protocol.ClientHello)
+}
+
+func (a *APITokenAuthentication) WriteAuthData(encoder *ch_encoding.Encoder) error {
+	err := encoder.String(apiTokenAuthUsername)
+	if err != nil {
+		return err
+	}
+	return encoder.String(a.token)
+}
+
+func (a *APITokenAuthentication) Identity() string {
+	return apiTokenAuthUsername
 }

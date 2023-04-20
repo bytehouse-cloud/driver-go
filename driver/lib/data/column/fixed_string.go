@@ -11,8 +11,9 @@ const (
 )
 
 type FixedStringColumnData struct {
-	raw  []byte
-	mask []byte
+	raw      []byte
+	mask     []byte
+	isClosed bool
 }
 
 func (f *FixedStringColumnData) ReadFromDecoder(decoder *ch_encoding.Decoder) error {
@@ -93,6 +94,10 @@ func (f *FixedStringColumnData) Len() int {
 }
 
 func (f *FixedStringColumnData) Close() error {
+	if f.isClosed {
+		return nil
+	}
+	f.isClosed = true
 	bytepool.PutBytes(f.mask)
 	bytepool.PutBytes(f.raw)
 	return nil
@@ -108,3 +113,10 @@ func removeNullBytes(buf []byte) []byte {
 	}
 	return buf[:end+1]
 }
+
+// func (f *FixedStringColumnData) processFixedString(s string) (string, error) {
+//	if len(s) > f.stringLen {
+//		return s[:f.stringLen], nil // todo: solve this temporary fix
+//	}
+//	return s, nil
+// }

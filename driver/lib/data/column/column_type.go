@@ -12,6 +12,10 @@ import (
 
 type CHColumnType string
 
+var (
+	NESTED_TYPE_ERROR = fmt.Errorf("[parseNestedType]: failed to pass nested type")
+)
+
 const (
 	// base type
 	INT8         CHColumnType = "Int8"
@@ -56,6 +60,10 @@ const (
 
 	// alias types
 	INT CHColumnType = "Int"
+
+	// Aggregate functions
+	AGGREGATEFUNCTION      CHColumnType = "AggregateFunction"
+	SIMPLEAGGREATEFUNCTION CHColumnType = "SimpleAggregateFunction"
 )
 
 // MustMakeColumnData attempts to make column data with give type and row count.
@@ -120,6 +128,41 @@ func generateComplex(t CHColumnType, location *time.Location) (GenerateColumnDat
 		return makeDateTimeColumnData(t, location)
 	case strings.HasPrefix(string(t), string(LOWCARDINALITY)):
 		return makeLowCardinality(t)
+	case strings.HasPrefix(string(t), string(SIMPLEAGGREATEFUNCTION)):
+		nestedType, err := parseNestedType(string(t), string(SIMPLEAGGREATEFUNCTION))
+		if err != nil {
+			return nil, err
+		}
+
+		baseImpl, ok := basicDataTypeImpl[nestedType]
+		if !ok { // the nestedType might not be simple data type
+			columnData, err := generateComplex(nestedType, location)
+			if err != nil {
+				return nil, err
+			}
+			return columnData, nil
+
+		}
+
+		return baseImpl, nil
+
+	case strings.HasPrefix(string(t), string(AGGREGATEFUNCTION)):
+		nestedType, err := parseNestedType(string(t), string(AGGREGATEFUNCTION))
+		if err != nil {
+			return nil, err
+		}
+
+		baseImpl, ok := basicDataTypeImpl[nestedType]
+		if !ok { // the nestedType might not be simple data type
+			columnData, err := generateComplex(nestedType, location)
+			if err != nil {
+				return nil, err
+			}
+			return columnData, nil
+		}
+
+		return baseImpl, nil
+
 	default:
 		return nil, fmt.Errorf("unsupported data type: %v", t)
 	}
@@ -199,8 +242,20 @@ var basicDataTypeImpl = map[CHColumnType]func(numRows int) CHColumnData{
 	},
 
 	DATE: func(numRows int) CHColumnData {
+		var dayOffset int
+		// TODO: @Khoi to check why we got this logic below.
+		// hourOffset := (time.Now().Hour() * 3600) - int(offset)
+		// if hourOffset < 0 {
+		// 	if offset > 0 {
+		// 		dayOffset++
+		// 	} else {
+		// 		dayOffset--
+		// 	}
+		// }
+
 		return &DateColumnData{
-			raw: bytepool.GetBytesWithLen(numRows * dateLen),
+			dayOffset: dayOffset,
+			raw:       bytepool.GetBytesWithLen(numRows * dateLen),
 		}
 	},
 
@@ -336,7 +391,7 @@ func makeEnum8ColumnData(t CHColumnType) (GenerateColumnData, error) {
 			break
 		}
 		enum8StringValuePair := strings.Split(s, enumSeparator)
-		enumString := strings.Trim(strings.TrimSpace(enum8StringValuePair[0]), string(singleQuote))
+		enumString := strings.Trim(strings.TrimSpace(enum8StringValuePair[0]), string(singleQuote)) // todo: check if needed to trim single quote
 		enum8Value, err := strconv.ParseInt(strings.TrimSpace(enum8StringValuePair[1]), 10, 8)
 		if err != nil {
 			return nil, err
@@ -457,7 +512,13 @@ func makeNullableColumnData(t CHColumnType) (GenerateColumnData, error) {
 }
 
 func makeLowCardinality(t CHColumnType) (GenerateColumnData, error) {
-	generateKeys, err := generateColumnDataFactoryOptionalTypeName(t[15 : len(t)-1]) // LowCardinality(innerType) -> innerType
+	var isNullable bool
+	innerType := t[15 : len(t)-1]
+	if strings.HasPrefix(string(innerType), string(NULLABLE)) {
+		innerType = innerType[9 : len(innerType)-1]
+		isNullable = true
+	}
+	generateKeys, err := generateColumnDataFactoryOptionalTypeName(innerType) // LowCardinality(innerType) -> innerType
 	if err != nil {
 		return nil, err
 	}
@@ -466,9 +527,10 @@ func makeLowCardinality(t CHColumnType) (GenerateColumnData, error) {
 		return &LowCardinalityColumnData{
 			// Default keys function's rows = 0 (keys function will be overwritten after reading)
 			// Need default keys function to prevent panics when some methods that require it are called
-			keys:         generateKeys(0),
-			generateKeys: generateKeys,
-			numRows:      numRows,
+			keys:          generateKeys(0),
+			generateKeys:  generateKeys,
+			numRows:       numRows,
+			isNullableCol: isNullable,
 		}
 	}, nil
 }
@@ -488,4 +550,47 @@ func generateColumnDataFactoryOptionalTypeName(t CHColumnType) (GenerateColumnDa
 
 	colTypeTrunc := CHColumnType(strings.TrimSpace(string(t[i:])))
 	return GenerateColumnDataFactory(colTypeTrunc)
+}
+
+func parseNestedType(chColumnType, prefix string) (CHColumnType, error) {
+	typeLen, prefLen := len(chColumnType), len(prefix)
+
+	if typeLen < prefLen+2 || chColumnType[prefLen] != roundOpenBracket || chColumnType[typeLen-1] != roundCloseBracket {
+		return "", NESTED_TYPE_ERROR
+	}
+
+	secondArg, err := returnSecondArg(chColumnType[len(prefix)+1 : typeLen-1])
+	if err != nil {
+		return "", err
+	}
+
+	return CHColumnType(strings.TrimSpace(secondArg)), nil
+}
+
+func returnSecondArg(args string) (string, error) {
+	// this util should the 2nd argument out of 2 arguments or return error if number of arguments != 2
+	counter := 0
+	for i, char := range args {
+		if char == '(' {
+			counter += 1
+		}
+		if char == ')' {
+			counter -= 1
+		}
+		if char == ',' && counter == 0 {
+			for j := i + 1; j < len(args); j++ {
+				if args[j] == '(' {
+					counter += 1
+				}
+				if args[j] == ')' {
+					counter -= 1
+				}
+				if args[j] == ',' && counter == 0 {
+					return "", NESTED_TYPE_ERROR
+				}
+			}
+			return args[i+1:], nil
+		}
+	}
+	return "", NESTED_TYPE_ERROR
 }

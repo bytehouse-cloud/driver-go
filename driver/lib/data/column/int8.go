@@ -10,7 +10,8 @@ import (
 const zeroString = "0"
 
 type Int8ColumnData struct {
-	raw []byte
+	raw      []byte
+	isClosed bool
 }
 
 func (i *Int8ColumnData) ReadFromDecoder(decoder *ch_encoding.Decoder) error {
@@ -86,6 +87,10 @@ func (i *Int8ColumnData) Len() int {
 }
 
 func (i *Int8ColumnData) Close() error {
+	if i.isClosed {
+		return nil
+	}
+	i.isClosed = true
 	bytepool.PutBytes(i.raw)
 	return nil
 }

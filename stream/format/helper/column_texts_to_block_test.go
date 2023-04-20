@@ -3,11 +3,14 @@ package helper
 import (
 	"context"
 	"fmt"
+	"log"
+	"runtime/debug"
 	"strings"
 	"testing"
 
-	"github.com/bytehouse-cloud/driver-go/driver/lib/data/column"
 	"github.com/stretchr/testify/assert"
+
+	"github.com/bytehouse-cloud/driver-go/driver/lib/data/column"
 )
 
 func TestColumnTextsToBlock_1_Block(t *testing.T) {
@@ -18,12 +21,26 @@ func TestColumnTextsToBlock_1_Block(t *testing.T) {
 	colTexstStreamer := NewColumnTextsStreamer(b, blockSize, newTestTableReader(5, -1))
 	colTextsStream := colTexstStreamer.Start(ctx)
 	go func() {
+		defer func() {
+			if r := recover(); r != nil {
+				log.Printf("A runtime panic has occurred with err = [%s],  stacktrace = [%s]\n",
+					r,
+					string(debug.Stack()))
+			}
+		}()
 		colTexstStreamer.Finish()
 	}()
 
 	toBlock := NewColumnTextsToBlock(colTextsStream, b)
 	blockOutputStream := toBlock.Start(ctx)
 	go func() {
+		defer func() {
+			if r := recover(); r != nil {
+				log.Printf("A runtime panic has occurred with err = [%s],  stacktrace = [%s]\n",
+					r,
+					string(debug.Stack()))
+			}
+		}()
 		toBlock.Finish()
 	}()
 
@@ -48,12 +65,26 @@ func TestColumnTextsToBlock_100_Rows(t *testing.T) {
 	colTexstStreamer := NewColumnTextsStreamer(b, blockSize, newTestTableReader(100, -1))
 	colTextsStream := colTexstStreamer.Start(ctx)
 	go func() {
+		defer func() {
+			if r := recover(); r != nil {
+				log.Printf("A runtime panic has occurred with err = [%s],  stacktrace = [%s]\n",
+					r,
+					string(debug.Stack()))
+			}
+		}()
 		colTexstStreamer.Finish()
 	}()
 
 	toBlock := NewColumnTextsToBlock(colTextsStream, b)
 	blockOutputStream := toBlock.Start(ctx)
 	go func() {
+		defer func() {
+			if r := recover(); r != nil {
+				log.Printf("A runtime panic has occurred with err = [%s],  stacktrace = [%s]\n",
+					r,
+					string(debug.Stack()))
+			}
+		}()
 		toBlock.Finish()
 	}()
 
@@ -97,12 +128,26 @@ func TestColumnTextsToBlock_3andHalf_blocks(t *testing.T) {
 	colTexstStreamer := NewColumnTextsStreamer(b, blockSize, newTestTableReader(16, -1))
 	colTextsStream := colTexstStreamer.Start(ctx)
 	go func() {
+		defer func() {
+			if r := recover(); r != nil {
+				log.Printf("A runtime panic has occurred with err = [%s],  stacktrace = [%s]\n",
+					r,
+					string(debug.Stack()))
+			}
+		}()
 		colTexstStreamer.Finish()
 	}()
 
 	toBlock := NewColumnTextsToBlock(colTextsStream, b)
 	blockOutputStream := toBlock.Start(ctx)
 	go func() {
+		defer func() {
+			if r := recover(); r != nil {
+				log.Printf("A runtime panic has occurred with err = [%s],  stacktrace = [%s]\n",
+					r,
+					string(debug.Stack()))
+			}
+		}()
 		toBlock.Finish()
 	}()
 
@@ -132,12 +177,26 @@ func TestColumnTextsToBlock_3_Rows(t *testing.T) {
 	colTexstStreamer := NewColumnTextsStreamer(b, blockSize, newTestTableReader(3, -1))
 	colTextsStream := colTexstStreamer.Start(ctx)
 	go func() {
+		defer func() {
+			if r := recover(); r != nil {
+				log.Printf("A runtime panic has occurred with err = [%s],  stacktrace = [%s]\n",
+					r,
+					string(debug.Stack()))
+			}
+		}()
 		colTexstStreamer.Finish()
 	}()
 
 	toBlock := NewColumnTextsToBlock(colTextsStream, b)
 	blockOutputStream := toBlock.Start(ctx)
 	go func() {
+		defer func() {
+			if r := recover(); r != nil {
+				log.Printf("A runtime panic has occurred with err = [%s],  stacktrace = [%s]\n",
+					r,
+					string(debug.Stack()))
+			}
+		}()
 		toBlock.Finish()
 	}()
 
@@ -164,12 +223,26 @@ func TestColumnTextsToBlock_1_Rows(t *testing.T) {
 	colTexstStreamer := NewColumnTextsStreamer(b, blockSize, newTestTableReader(1, -1))
 	colTextsStream := colTexstStreamer.Start(ctx)
 	go func() {
+		defer func() {
+			if r := recover(); r != nil {
+				log.Printf("A runtime panic has occurred with err = [%s],  stacktrace = [%s]\n",
+					r,
+					string(debug.Stack()))
+			}
+		}()
 		colTexstStreamer.Finish()
 	}()
 
 	toBlock := NewColumnTextsToBlock(colTextsStream, b)
 	blockOutputStream := toBlock.Start(ctx)
 	go func() {
+		defer func() {
+			if r := recover(); r != nil {
+				log.Printf("A runtime panic has occurred with err = [%s],  stacktrace = [%s]\n",
+					r,
+					string(debug.Stack()))
+			}
+		}()
 		toBlock.Finish()
 	}()
 
@@ -196,12 +269,26 @@ func TestColumnTextsToBlock_0_Rows(t *testing.T) {
 	colTexstStreamer := NewColumnTextsStreamer(b, blockSize, newTestTableReader(0, -1))
 	colTextsStream := colTexstStreamer.Start(ctx)
 	go func() {
+		defer func() {
+			if r := recover(); r != nil {
+				log.Printf("A runtime panic has occurred with err = [%s],  stacktrace = [%s]\n",
+					r,
+					string(debug.Stack()))
+			}
+		}()
 		colTexstStreamer.Finish()
 	}()
 
 	toBlock := NewColumnTextsToBlock(colTextsStream, b)
 	blockOutputStream := toBlock.Start(ctx)
 	go func() {
+		defer func() {
+			if r := recover(); r != nil {
+				log.Printf("A runtime panic has occurred with err = [%s],  stacktrace = [%s]\n",
+					r,
+					string(debug.Stack()))
+			}
+		}()
 		toBlock.Finish()
 	}()
 

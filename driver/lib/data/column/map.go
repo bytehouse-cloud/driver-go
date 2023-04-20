@@ -249,10 +249,24 @@ func (m *MapColumnData) GetValue(row int) interface{} {
 	for i := range keys {
 		k := reflect.ValueOf(keys[i])
 		v := reflect.ValueOf(values[i])
+
+		if arrI, ok := values[i].([]interface{}); ok {
+			v = modifyTypeForArray(arrI, valueType)
+		}
 		result.SetMapIndex(k, v)
 	}
 
 	return result.Interface()
+}
+
+func modifyTypeForArray(arrI []interface{}, typ reflect.Type) reflect.Value {
+	arrOfDesiredType := reflect.MakeSlice(typ, len(arrI), len(arrI))
+	for i, _ := range arrI {
+		idx := arrOfDesiredType.Index(i)
+		idx.Set(reflect.ValueOf(arrI[i]))
+	}
+	v := reflect.ValueOf(arrOfDesiredType.Interface())
+	return v
 }
 
 func (m *MapColumnData) GetString(row int) string {

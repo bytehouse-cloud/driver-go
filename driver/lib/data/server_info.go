@@ -4,6 +4,9 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	// to support timezone in windows
+	// https://github.com/golang/go/issues/38453
+	_ "time/tzdata"
 
 	"github.com/bytehouse-cloud/driver-go/driver/lib/ch_encoding"
 	"github.com/bytehouse-cloud/driver-go/driver/protocol"
