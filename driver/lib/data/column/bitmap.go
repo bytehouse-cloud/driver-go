@@ -17,7 +17,8 @@ var bitmapZeroValue = []uint64{}
 // BitMapColumnData
 // Data representation is an uint64 array
 type BitMapColumnData struct {
-	raw [][]byte
+	raw      [][]byte
+	isClosed bool
 }
 
 func (b *BitMapColumnData) ReadFromValues(values []interface{}) (int, error) {
@@ -255,6 +256,10 @@ func (b *BitMapColumnData) Len() int {
 }
 
 func (b *BitMapColumnData) Close() error {
+	if b.isClosed {
+		return nil
+	}
+	b.isClosed = true
 	for _, d := range b.raw {
 		bytepool.PutBytes(d)
 	}

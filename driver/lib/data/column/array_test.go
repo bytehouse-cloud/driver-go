@@ -176,6 +176,16 @@ func TestArrayColumnData_ReadFromTexts(t *testing.T) {
 			wantRowsRead:    2,
 			wantErr:         true,
 		},
+		{
+			name:       "Should write data and return number of rows read with no error with nested array, 2 rows",
+			columnType: "Array(Array(Array(UInt32)))",
+			args: args{
+				texts: []string{"[[[11, 11, 0, 2], [2, 3]]]", "[[[11, 11, 0, 2], [2, 3]]]"},
+			},
+			wantDataWritten: []string{"[[[11, 11, 0, 2], [2, 3]]]", "[[[11, 11, 0, 2], [2, 3]]]"},
+			wantRowsRead:    2,
+			wantErr:         false,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

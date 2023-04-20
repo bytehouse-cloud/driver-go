@@ -15,6 +15,7 @@ const (
 type NullableColumnData struct {
 	mask            []byte
 	innerColumnData CHColumnData
+	isClosed        bool
 }
 
 func (n *NullableColumnData) ReadFromDecoder(decoder *ch_encoding.Decoder) error {
@@ -52,8 +53,7 @@ func (n *NullableColumnData) ReadFromTexts(texts []string) (int, error) {
 
 	dummyString := n.innerColumnData.ZeroString()
 	for i, text := range textsCopy {
-		switch text {
-		case NULL, NULLSmall, NULLAlt, NULLDisplay:
+		if isNull(text) {
 			n.mask[i] = 1
 			textsCopy[i] = dummyString
 		}
@@ -76,6 +76,10 @@ func (n *NullableColumnData) GetString(row int) string {
 	return NULLDisplay
 }
 
+func (n *NullableColumnData) GetInnerColumnData() CHColumnData {
+	return n.innerColumnData
+}
+
 func (n *NullableColumnData) Zero() interface{} {
 	return n.innerColumnData.Zero()
 }
@@ -89,6 +93,18 @@ func (n *NullableColumnData) Len() int {
 }
 
 func (n *NullableColumnData) Close() error {
+	if n.isClosed {
+		return nil
+	}
+	n.isClosed = true
 	bytepool.PutBytes(n.mask)
 	return n.innerColumnData.Close()
+}
+
+func isNull(text string) bool {
+	switch text {
+	case NULL, NULLSmall, NULLAlt, NULLDisplay:
+		return true
+	}
+	return false
 }

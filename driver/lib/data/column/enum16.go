@@ -16,9 +16,10 @@ const (
 )
 
 type Enum16ColumnData struct {
-	raw  []byte
-	itoa map[int16]string
-	atoi map[string]int16
+	raw      []byte
+	itoa     map[int16]string
+	atoi     map[string]int16
+	isClosed bool
 }
 
 func (e *Enum16ColumnData) ReadFromDecoder(decoder *ch_encoding.Decoder) error {
@@ -94,6 +95,10 @@ func (e *Enum16ColumnData) Len() int {
 }
 
 func (e *Enum16ColumnData) Close() error {
+	if e.isClosed {
+		return nil
+	}
+	e.isClosed = true
 	bytepool.PutBytes(e.raw)
 	return nil
 }

@@ -1,9 +1,10 @@
 package conn
 
 import (
-	"bufio"
 	"context"
 	"fmt"
+	"log"
+	"runtime/debug"
 	"strings"
 
 	"github.com/google/uuid"
@@ -13,12 +14,12 @@ import (
 	"github.com/bytehouse-cloud/driver-go/driver/protocol"
 	"github.com/bytehouse-cloud/driver-go/driver/response"
 	"github.com/bytehouse-cloud/driver-go/errors"
+	"github.com/bytehouse-cloud/driver-go/sdk/param"
 )
 
 type GatewayConn struct {
-	connOptions *ConnConfig
+	connConfigs *ConnConfig
 	conn        *connect
-	writer      *bufio.Writer
 	encoder     *ch_encoding.Encoder
 	decoder     *ch_encoding.Decoder
 
@@ -38,14 +39,14 @@ type GatewayConn struct {
 }
 
 func NewGatewayConn(
-	connOptions *ConnConfig,
+	connConfigs *ConnConfig,
 	database string,
 	authentication Authentication,
 	compress bool,
 	querySetting map[string]interface{},
 ) *GatewayConn {
 	g := &GatewayConn{
-		connOptions:    connOptions,
+		connConfigs:    connConfigs,
 		compress:       compress,
 		userInfo:       NewUserInfo(),
 		authentication: authentication,
@@ -55,7 +56,7 @@ func NewGatewayConn(
 	}
 
 	g.clone = func() *GatewayConn {
-		return NewGatewayConn(g.connOptions, g.database, g.authentication, g.compress, g.settings)
+		return NewGatewayConn(g.connConfigs, g.database, g.authentication, g.compress, g.settings)
 	}
 
 	return g
@@ -63,17 +64,18 @@ func NewGatewayConn(
 
 func (g *GatewayConn) forceConnect() error {
 	if g.connected {
+		g.conn.UpdateTimeouts(g.connConfigs)
 		return nil
 	}
 
 	if err := g.connect(); err != nil {
 		return err
 	}
-	return g.verifySettings(g.settings)
+	return g.flushConnConfigs(g.connConfigs)
 }
 
 func (g *GatewayConn) connect() error {
-	newConn, err := dial(g.connOptions)
+	newConn, err := dial(g.connConfigs)
 	if err != nil {
 		return err
 	}
@@ -81,14 +83,12 @@ func (g *GatewayConn) connect() error {
 	g.conn = newConn
 	g.logf = newConn.logf
 
-	g.writer = bufio.NewWriter(g.conn)
-
 	if g.compress {
 		g.decoder = ch_encoding.NewDecoderWithCompress(g.conn)
-		g.encoder = ch_encoding.NewEncoderWithCompress(g.writer)
+		g.encoder = ch_encoding.NewEncoderWithCompress(g.conn)
 	} else {
 		g.decoder = ch_encoding.NewDecoder(g.conn)
-		g.encoder = ch_encoding.NewEncoder(g.writer)
+		g.encoder = ch_encoding.NewEncoder(g.conn)
 	}
 
 	if err := g.initialExchange(); err != nil {
@@ -175,6 +175,10 @@ func (g *GatewayConn) CheckConnection() (err error) {
 	if err := g.forceConnect(); err != nil {
 		return err
 	}
+	return g.Ping()
+}
+
+func (g *GatewayConn) Ping() error {
 	if err := g.writeUvarint(protocol.ClientPing); err != nil {
 		return NewErrBadConnection(fmt.Sprintf("write uint64 error: %s", err))
 	}
@@ -309,6 +313,13 @@ func (g *GatewayConn) sendClientDataWithTableName(block *data.Block, tableName s
 // Non-blocking process
 func (g *GatewayConn) Cancel() {
 	go func() {
+		defer func() {
+			if r := recover(); r != nil {
+				log.Printf("A runtime panic has occurred with err = [%s],  stacktrace = [%s]\n",
+					r,
+					string(debug.Stack()))
+			}
+		}()
 		_ = g.writeUvarint(protocol.ClientCancel)
 		_ = g.flush()
 		_ = g.conn.Close()
@@ -343,27 +354,26 @@ func (g *GatewayConn) verifySingleSetting(name string, value interface{}) error 
 	return g.SendQueryAssertNoError(context.Background(), sb.String())
 }
 
-// uerifySettings send set settings query to server to verify query settings
-func (g *GatewayConn) verifySettings(settings map[string]interface{}) error {
-	revert := g.remove_log_id()
-	defer revert()
-
-	if len(settings) == 0 {
+// verifySettings send set settings query to server to verify query settings
+func (g *GatewayConn) flushConnConfigs(configs *ConnConfig) error {
+	if configs == nil {
 		return nil
 	}
-
 	var sb strings.Builder
 	sb.WriteString("SET ")
-
-	for k, v := range settings {
-		sb.WriteString(k)
-		sb.WriteString(" = ")
-		writeSettingValueFmt(&sb, v)
-		sb.WriteByte(',')
-	}
+	sb.WriteString(param.SEND_TIMEOUT)
+	sb.WriteString(" = ")
+	writeSettingValueFmt(&sb, configs.sendTimeoutSeconds)
+	sb.WriteByte(',')
+	sb.WriteString(param.RECEIVE_TIMEOUT)
+	sb.WriteString(" = ")
+	writeSettingValueFmt(&sb, configs.receiveTimeoutSeconds)
 
 	query := sb.String()
-	query = query[:len(query)-1] // to remove the last ','
+
+	// skip query history for flushing conn configs
+	revert := g.setByteHouseNonUserQuery()
+	defer revert()
 	return g.SendQueryAssertNoError(context.Background(), query)
 }
 
@@ -428,10 +438,56 @@ func (g *GatewayConn) AddSettingsTemporarily(temp map[string]interface{}) func()
 	}
 }
 
-func (g *GatewayConn) AddSetting(key string, value interface{}) error {
-	if err := g.verifySingleSetting(key, value); err != nil {
-		return err
+func (g *GatewayConn) ApplyConnConfigs(configs map[string]interface{}) {
+	for k, v := range configs {
+		if k == param.SEND_TIMEOUT {
+			sec, ok := v.(uint64)
+			if !ok {
+				continue
+			}
+			g.connConfigs.sendTimeoutSeconds = sec
+		}
+		if k == param.RECEIVE_TIMEOUT {
+			sec, ok := v.(uint64)
+			if !ok {
+				continue
+			}
+			g.connConfigs.receiveTimeoutSeconds = sec
+		}
 	}
+}
+
+func (g *GatewayConn) ApplyConnConfigsTemporarily(configs map[string]interface{}) func() {
+	originalSendTimeout := g.connConfigs.sendTimeoutSeconds
+	originalReceiveTimeout := g.connConfigs.receiveTimeoutSeconds
+
+	for k, v := range configs {
+		if k == param.SEND_TIMEOUT {
+			sec, ok := v.(uint64)
+			if !ok {
+				continue
+			}
+			g.connConfigs.sendTimeoutSeconds = sec
+		}
+		if k == param.RECEIVE_TIMEOUT {
+			sec, ok := v.(uint64)
+			if !ok {
+				continue
+			}
+			g.connConfigs.receiveTimeoutSeconds = sec
+		}
+	}
+
+	return func() {
+		g.connConfigs.sendTimeoutSeconds = originalSendTimeout
+		g.connConfigs.receiveTimeoutSeconds = originalReceiveTimeout
+	}
+}
+
+func (g *GatewayConn) AddSetting(key string, value interface{}) error {
+	//if err := g.verifySingleSetting(key, value); err != nil {
+	//	return err
+	//}
 	g.settings[key] = value
 	return nil
 }
@@ -498,15 +554,29 @@ func (g *GatewayConn) InQueryingState() bool {
 	return g.inQuery
 }
 
-func (g *GatewayConn) remove_log_id() func() {
-	log_id, ok := g.settings["log_id"]
-	if !ok {
+// setByteHouseNonUserQuery interprets queries to be not
+// explicitly executed by users until callback function is called
+func (g *GatewayConn) setByteHouseNonUserQuery() func() {
+	if g.serverInfo.Name != "ByteHouse" {
 		return func() {}
 	}
 
+	// backup
+	logID, havelogID := g.settings["log_id"]
+	skipHistory, haveSkipHistory := g.settings["skip_history"]
+
+	// apply
 	delete(g.settings, "log_id")
+	g.settings["skip_history"] = true
+
+	// revert
 	return func() {
-		g.settings["log_id"] = log_id
+		if havelogID {
+			g.settings["log_id"] = logID
+		}
+		if haveSkipHistory {
+			g.settings["skip_history"] = skipHistory
+		}
 	}
 }
 

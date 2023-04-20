@@ -2,7 +2,9 @@ package format
 
 import (
 	"bytes"
+	"log"
 	"reflect"
+	"runtime/debug"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -155,6 +157,13 @@ func Test_PrettyWrite(t *testing.T) {
 func toBlockStream(blocks []*data.Block) <-chan *data.Block {
 	bs := make(chan *data.Block, 1)
 	go func() {
+		defer func() {
+			if r := recover(); r != nil {
+				log.Printf("A runtime panic has occurred with err = [%s],  stacktrace = [%s]\n",
+					r,
+					string(debug.Stack()))
+			}
+		}()
 		defer close(bs)
 		for _, b := range blocks {
 			bs <- b

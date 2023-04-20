@@ -11,7 +11,8 @@ import (
 const uint32ByteSize = 4
 
 type UInt32ColumnData struct {
-	raw []byte
+	raw      []byte
+	isClosed bool
 }
 
 func (u *UInt32ColumnData) ReadFromDecoder(decoder *ch_encoding.Decoder) error {
@@ -97,6 +98,10 @@ func (u *UInt32ColumnData) Len() int {
 }
 
 func (u *UInt32ColumnData) Close() error {
+	if u.isClosed {
+		return nil
+	}
+	u.isClosed = true
 	bytepool.PutBytes(u.raw)
 	return nil
 }

@@ -15,7 +15,8 @@ const (
 var zeroUUID = uuid.MustParse(zeroUUIDString)
 
 type UUIDColumnData struct {
-	raw []byte
+	raw      []byte
+	isClosed bool
 }
 
 func (u *UUIDColumnData) ReadFromDecoder(decoder *ch_encoding.Decoder) error {
@@ -112,6 +113,10 @@ func (u *UUIDColumnData) Len() int {
 }
 
 func (u *UUIDColumnData) Close() error {
+	if u.isClosed {
+		return nil
+	}
+	u.isClosed = true
 	bytepool.PutBytes(u.raw)
 	return nil
 }

@@ -14,7 +14,8 @@ const (
 )
 
 type IPv6ColumnData struct {
-	raw []byte
+	raw      []byte
+	isClosed bool
 }
 
 func (i *IPv6ColumnData) ReadFromDecoder(decoder *ch_encoding.Decoder) error {
@@ -87,6 +88,10 @@ func (i *IPv6ColumnData) Len() int {
 }
 
 func (i *IPv6ColumnData) Close() error {
+	if i.isClosed {
+		return nil
+	}
+	i.isClosed = true
 	bytepool.PutBytes(i.raw)
 	return nil
 }

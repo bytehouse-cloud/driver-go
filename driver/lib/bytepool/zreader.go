@@ -52,6 +52,9 @@ func (z *ZReader) startRead() {
 	for buf := range z.forReceive {
 		n, err := z.r.Read(buf)
 		if err != nil {
+			if n > 0 {
+				z.forRead <- buf[:n]
+			}
 			z.exception = err
 			return
 		}

@@ -41,6 +41,7 @@ type DecimalColumnData struct {
 	byteCount   int
 	raw         []byte
 	fmtTemplate string
+	isClosed    bool
 }
 
 func (d *DecimalColumnData) ReadFromDecoder(decoder *ch_encoding.Decoder) error {
@@ -149,6 +150,10 @@ func (d *DecimalColumnData) Len() int {
 }
 
 func (d *DecimalColumnData) Close() error {
+	if d.isClosed {
+		return nil
+	}
+	d.isClosed = true
 	bytepool.PutBytes(d.raw)
 	return nil
 }

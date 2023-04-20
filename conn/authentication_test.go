@@ -25,6 +25,11 @@ func TestAuthentication(t *testing.T) {
 			auth:            NewSystemAuthentication("some_system_token"),
 			wantWrittenData: []byte{232, 7, 17, 115, 111, 109, 101, 95, 115, 121, 115, 116, 101, 109, 95, 116, 111, 107, 101, 110},
 		},
+		{
+			name:            "If API Token Authentication then Write OK",
+			auth:            NewAPITokenAuthentication("some_api_token"),
+			wantWrittenData: []byte{0, 9, 98, 121, 116, 101, 104, 111, 117, 115, 101, 14, 115, 111, 109, 101, 95, 97, 112, 105, 95, 116, 111, 107, 101, 110},
+		},
 	}
 
 	for _, tt := range tests {

@@ -221,6 +221,20 @@ func TestCSVBlockStreamFmtReader_BlockStreamFmtRead(t *testing.T) {
 			wantBlocksRead: 1,
 			wantRowsRead:   1,
 		},
+		{
+			name: "Can handle nullable value in the last column",
+			blockStreamReader: func() BlockStreamFmtReader {
+				b, _ := BlockStreamFmtReaderFactory(Formats[CSV], bytes.NewReader([]byte("1,\n1,2")), emptySettings)
+				return b
+			}(),
+			args: args{
+				ctx:       c,
+				sample:    int32Sample,
+				blockSize: 1, // Number of rows for each block
+			},
+			wantBlocksRead: 2,
+			wantRowsRead:   2,
+		},
 	}
 
 	for _, tt := range tests {

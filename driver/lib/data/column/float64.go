@@ -24,7 +24,8 @@ const defaultFloatFormat = 'g'
 const float64ByteSize = 8
 
 type Float64ColumnData struct {
-	raw []byte
+	raw      []byte
+	isClosed bool
 }
 
 func (f *Float64ColumnData) ReadFromDecoder(decoder *ch_encoding.Decoder) error {
@@ -111,6 +112,10 @@ func (f *Float64ColumnData) Len() int {
 }
 
 func (f *Float64ColumnData) Close() error {
+	if f.isClosed {
+		return nil
+	}
+	f.isClosed = true
 	bytepool.PutBytes(f.raw)
 	return nil
 }

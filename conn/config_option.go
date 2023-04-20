@@ -2,7 +2,6 @@ package conn
 
 import (
 	"crypto/tls"
-	"time"
 )
 
 type OptionConfig func(connConfigs *ConnConfig) error
@@ -89,23 +88,23 @@ func OptionTlsConfigFromRegistry(key string) OptionConfig {
 	}
 }
 
-func OptionConnTimeout(d time.Duration) OptionConfig {
+func OptionConnTimeout(d uint64) OptionConfig {
 	return func(connConfigs *ConnConfig) error {
-		connConfigs.connTimeout = d
+		connConfigs.connTimeoutSeconds = d
 		return nil
 	}
 }
 
-func OptionWriteTimeout(d time.Duration) OptionConfig {
+func OptionSendTimeout(d uint64) OptionConfig {
 	return func(connConfigs *ConnConfig) error {
-		connConfigs.writeTimeout = d
+		connConfigs.sendTimeoutSeconds = d
 		return nil
 	}
 }
 
-func OptionReadTimeout(d time.Duration) OptionConfig {
+func OptionReceiveTimeout(d uint64) OptionConfig {
 	return func(connConfigs *ConnConfig) error {
-		connConfigs.readTimeout = d
+		connConfigs.receiveTimeoutSeconds = d
 		return nil
 	}
 }

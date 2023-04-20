@@ -2,6 +2,8 @@ package conn
 
 import (
 	"context"
+	"log"
+	"runtime/debug"
 
 	"github.com/bytehouse-cloud/driver-go/driver/lib/data"
 	"github.com/bytehouse-cloud/driver-go/driver/response"
@@ -12,6 +14,13 @@ func (g *GatewayConn) GetResponseStream(ctx context.Context) <-chan response.Pac
 	responseChannel := make(chan response.Packet, 10)
 
 	go func() {
+		defer func() {
+			if r := recover(); r != nil {
+				log.Printf("A runtime panic has occurred with err = [%s],  stacktrace = [%s]\n",
+					r,
+					string(debug.Stack()))
+			}
+		}()
 		defer close(responseChannel)
 		defer func() {
 			g.inQuery = false

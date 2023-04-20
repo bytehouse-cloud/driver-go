@@ -171,8 +171,6 @@ var Default = map[string]interface{}{
 
 	"connect_timeout":                             uint64(DBMS_DEFAULT_CONNECT_TIMEOUT_SEC),
 	"connect_timeout_with_failover_ms":            uint64(DBMS_DEFAULT_CONNECT_TIMEOUT_WITH_FAILOVER_MS),
-	"receive_timeout":                             uint64(DBMS_DEFAULT_RECEIVE_TIMEOUT_SEC),
-	"send_timeout":                                uint64(DBMS_DEFAULT_SEND_TIMEOUT_SEC),
 	"tcp_keep_alive_timeout":                      uint64(0),
 	"queue_max_wait_ms":                           uint64(5000),
 	"distributed_directory_monitor_sleep_time_ms": uint64(100),
@@ -358,6 +356,10 @@ var Default = map[string]interface{}{
 	"preload_checksums_and_primary_index_cache": false,
 	"enable_testlog_to_console":                 false,
 
+	// CNCH BitEngine dict
+	"dict_table_full_mode": false,
+
+	// CNCH Distributed Stages
 	"enable_distributed_stages": false,
 
 	"allow_experimental_map_type":   false,
@@ -373,4 +375,8 @@ var Default = map[string]interface{}{
 	"statement_timeout_in_seconds": uint64(0),
 
 	"virtual_warehouse": "",
+
+	// CNCH Compatibility with vanilla Clickhouse
+	"force_query_to_shard":        false,
+	"insert_select_with_profiles": false,
 }

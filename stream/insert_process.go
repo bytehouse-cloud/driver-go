@@ -2,6 +2,8 @@ package stream
 
 import (
 	"context"
+	"log"
+	"runtime/debug"
 	"time"
 
 	"github.com/bytehouse-cloud/driver-go/driver/lib/data"
@@ -66,6 +68,13 @@ func (p *InsertProcess) Start(ctx context.Context,
 
 func (p *InsertProcess) startWatchingEvents(ctx context.Context) {
 	go func() {
+		defer func() {
+			if r := recover(); r != nil {
+				log.Printf("A runtime panic has occurred with err = [%s],  stacktrace = [%s]\n",
+					r,
+					string(debug.Stack()))
+			}
+		}()
 		if p.callBackResp == nil {
 			p.callBackResp = func(resp response.Packet) {}
 		}

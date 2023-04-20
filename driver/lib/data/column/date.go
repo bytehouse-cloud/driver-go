@@ -2,6 +2,7 @@ package column
 
 import (
 	"encoding/binary"
+	"fmt"
 	"time"
 
 	"github.com/bytehouse-cloud/driver-go/driver/lib/bytepool"
@@ -9,11 +10,35 @@ import (
 )
 
 const (
-	dateLen     = 2
-	dateFormat  = "2006-01-02"
-	dayHours    = 24
-	hourSeconds = 3600
+	dateLen           = 2
+	dayHours          = 24
+	hourSeconds       = 3600
+	defaultDateFormat = "2006-01-02" // todo: allow client to specify format for date
 )
+
+var supportedNumericalDateFormats = []string{
+	"20060102", // yyyyMMdd
+	"02012006", // ddMMyyyy
+}
+
+var supportedStringDateFormats = []string{
+	"2006-1-2",       // yyyy-M-d, can cover yyyy-MM-dd case too
+	"2-1-2006",       // d-M-yyyy, can cover dd-MM-yyyy case too, MM-dd-yyyy may conflict with dd-MM-yyyy, thus MM-dd-yyyy is not supported
+	"2006/1/2",       // yyyy/M/d, can cover yyyy/MM/dd case too
+	"2/1/2006",       // d/M/yyyy, can cover dd/MM/yyyy case too, MM/dd/yyyy may conflict with dd/MM/yyyy, thus MM/dd/yyyy is not supported
+	"2006-Jan-2",     // yyyy-Mon-d, can cover yyyy-Mon-dd case too
+	"2-Jan-2006",     // d-Mon-yyyy, can cover dd-Mon-yyyy case too
+	"Jan-2-2006",     // Mon-d-yyyy, can cover Mon-dd-yyyy case too
+	"2006/Jan/2",     // yyyy/Mon/d, can cover yyyy/Mon/dd case too
+	"2/Jan/2006",     // d/Mon/yyyy, can cover dd/Mon/yyyy case too
+	"Jan/2/2006",     // Mon/d/yyyy, can cover Mon/dd/yyyy case too
+	"2006-January-2", // yyyy-Month-d, can cover yyyy-Month-dd case too
+	"2-January-2006", // d-Month-yyyy, can cover dd-Month-yyyy case too
+	"January-2-2006", // Month-d-yyyy, can cover Month-dd-yyyy case too
+	"2006/January/2", // yyyy/Month/d, can cover yyyy/Month/dd case too
+	"2/January/2006", // d/Month/yyyy, can cover dd/Month/yyyy case too
+	"January/2/2006", // Month/d/yyyy, can cover Month/dd/yyyy case too
+}
 
 var zeroTime = time.Unix(0, 0)
 
@@ -23,7 +48,9 @@ var offset = func() int64 {
 }()
 
 type DateColumnData struct {
-	raw []byte
+	dayOffset int
+	raw       []byte
+	isClosed  bool
 }
 
 func (d *DateColumnData) ReadFromDecoder(decoder *ch_encoding.Decoder) error {
@@ -60,7 +87,7 @@ func (d *DateColumnData) ReadFromTexts(texts []string) (int, error) {
 	)
 
 	// Use UTC for location to prevent date from being modified
-	parseTime := interpretTimeFormat([]string{dateFormat, dateTimeFormat}, texts, time.UTC)
+	parseTime := interpretTimeFormat(supportedStringDateFormats, texts, time.UTC)
 
 	for i, text := range texts {
 		if text == "" {
@@ -72,7 +99,16 @@ func (d *DateColumnData) ReadFromTexts(texts []string) (int, error) {
 		if err != nil {
 			return i, err
 		}
-		binary.LittleEndian.PutUint16(d.raw[i*dateLen:], uint16((t.Unix())/dayHours/hourSeconds))
+		parsedDateInInt64 := t.Unix() / dayHours / hourSeconds
+		var supportedDateMax int64 = 65535 // 2149-06-06
+		var supportedDateMin int64 = 0     // 1970-01-01
+		if parsedDateInInt64 > supportedDateMax || parsedDateInInt64 < supportedDateMin {
+			return i, fmt.Errorf(
+				"invalid value for type Date, given %s, but supported range is 1970-01-01 - 2149-06-06",
+				text,
+			)
+		}
+		binary.LittleEndian.PutUint16(d.raw[i*dateLen:], uint16(parsedDateInInt64))
 	}
 	return len(texts), nil
 }
@@ -80,7 +116,7 @@ func (d *DateColumnData) ReadFromTexts(texts []string) (int, error) {
 func (d *DateColumnData) get(row int) time.Time {
 	daysSinceEpoch := bufferRowToUint16(d.raw, row)
 	secondsSinceEpoch := int64(daysSinceEpoch) * dayHours * hourSeconds
-	return time.Unix(secondsSinceEpoch-offset, 0)
+	return time.Unix(secondsSinceEpoch, 0)
 }
 
 func (d *DateColumnData) GetValue(row int) interface{} {
@@ -88,7 +124,7 @@ func (d *DateColumnData) GetValue(row int) interface{} {
 }
 
 func (d *DateColumnData) GetString(row int) string {
-	return d.get(row).Format(dateFormat)
+	return d.get(row).Format(defaultDateFormat)
 }
 
 func (d *DateColumnData) Zero() interface{} {
@@ -96,7 +132,7 @@ func (d *DateColumnData) Zero() interface{} {
 }
 
 func (d *DateColumnData) ZeroString() string {
-	return zeroTime.Format(dateFormat)
+	return zeroTime.Format(defaultDateFormat)
 }
 
 func (d *DateColumnData) Len() int {
@@ -104,6 +140,10 @@ func (d *DateColumnData) Len() int {
 }
 
 func (d *DateColumnData) Close() error {
+	if d.isClosed {
+		return nil
+	}
+	d.isClosed = false
 	bytepool.PutBytes(d.raw)
 	return nil
 }

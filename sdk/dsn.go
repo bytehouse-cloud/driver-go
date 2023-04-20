@@ -6,7 +6,6 @@ import (
 	"net/url"
 	"strconv"
 	"strings"
-	"time"
 
 	bytehouse "github.com/bytehouse-cloud/driver-go"
 	"github.com/bytehouse-cloud/driver-go/conn"
@@ -19,9 +18,6 @@ var (
 	ErrDsnMissingSecretKey   = errors.New("missing secret key in dsn")
 	ErrDsnMissingRegion      = errors.New("missing region in dsn")
 	ErrTokenAuthNotSupported = errors.New("token authentication not supported")
-	defaultConnectionTimeout = 3 * time.Second
-	defaultReadTimeout       = time.Minute
-	defaultWriteTimeout      = time.Minute
 )
 
 // Config is a configuration parsed from a DSN string.
@@ -187,33 +183,33 @@ func makeConnConfigs(host string, urlValues url.Values, logf func(s string, i ..
 	}
 
 	if connTimeout := urlValues.Get(param.CONNECTION_TIMEOUT); connTimeout != "" {
-		duration, err := time.ParseDuration(connTimeout)
+		duration, err := parseUint(connTimeout)
 		if err != nil {
 			return nil, fmt.Errorf(ErrParseParamFmt, param.CONNECTION_TIMEOUT, duration, connTimeout, err)
 		}
 		opts = append(opts, conn.OptionConnTimeout(duration))
 	} else {
-		opts = append(opts, conn.OptionConnTimeout(defaultConnectionTimeout))
+		opts = append(opts, conn.OptionConnTimeout(settings.DBMS_DEFAULT_CONNECT_TIMEOUT_SEC))
 	}
 
-	if readTimeout := urlValues.Get(param.READ_TIMEOUT); readTimeout != "" {
-		duration, err := time.ParseDuration(readTimeout)
+	if receiveTimeout := urlValues.Get(param.RECEIVE_TIMEOUT); receiveTimeout != "" {
+		duration, err := parseUint(receiveTimeout)
 		if err != nil {
-			return nil, fmt.Errorf(ErrParseParamFmt, param.READ_TIMEOUT, duration, readTimeout, err)
+			return nil, fmt.Errorf(ErrParseParamFmt, param.RECEIVE_TIMEOUT, duration, receiveTimeout, err)
 		}
-		opts = append(opts, conn.OptionReadTimeout(duration))
+		opts = append(opts, conn.OptionReceiveTimeout(duration))
 	} else {
-		opts = append(opts, conn.OptionReadTimeout(defaultReadTimeout))
+		opts = append(opts, conn.OptionReceiveTimeout(settings.DBMS_DEFAULT_RECEIVE_TIMEOUT_SEC))
 	}
 
-	if writeTimeout := urlValues.Get(param.WRITE_TIMEOUT); writeTimeout != "" {
-		duration, err := time.ParseDuration(writeTimeout)
+	if sendTimeout := urlValues.Get(param.SEND_TIMEOUT); sendTimeout != "" {
+		duration, err := parseUint(sendTimeout)
 		if err != nil {
-			return nil, fmt.Errorf(ErrParseParamFmt, param.WRITE_TIMEOUT, duration, writeTimeout, err)
+			return nil, fmt.Errorf(ErrParseParamFmt, param.SEND_TIMEOUT, duration, sendTimeout, err)
 		}
-		opts = append(opts, conn.OptionWriteTimeout(duration))
+		opts = append(opts, conn.OptionSendTimeout(duration))
 	} else {
-		opts = append(opts, conn.OptionWriteTimeout(defaultWriteTimeout))
+		opts = append(opts, conn.OptionSendTimeout(settings.DBMS_DEFAULT_SEND_TIMEOUT_SEC))
 	}
 
 	return conn.NewConnConfig(opts...)
@@ -247,7 +243,7 @@ func makeAuthentication(urlValues url.Values) (conn.Authentication, error) {
 				return conn.NewSystemAuthentication(token), nil
 			}
 		}
-		return nil, ErrTokenAuthNotSupported
+		return conn.NewAPITokenAuthentication(token), nil
 	}
 
 	username := urlValues.Get(param.USER)
@@ -267,4 +263,11 @@ func parseBool(s string) (bool, error) {
 		return false, nil
 	}
 	return strconv.ParseBool(s)
+}
+
+func parseUint(s string) (uint64, error) {
+	if s == "" {
+		return 0, nil
+	}
+	return strconv.ParseUint(s, 10, 64)
 }

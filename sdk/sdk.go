@@ -3,7 +3,11 @@ package sdk
 import (
 	"bytes"
 	"context"
+	"errors"
+	"fmt"
 	"io"
+	"log"
+	"runtime/debug"
 
 	"golang.org/x/sync/errgroup"
 
@@ -12,7 +16,6 @@ import (
 	"github.com/bytehouse-cloud/driver-go/driver/lib/data"
 	"github.com/bytehouse-cloud/driver-go/driver/lib/settings"
 	"github.com/bytehouse-cloud/driver-go/driver/response"
-	"github.com/bytehouse-cloud/driver-go/errors"
 	"github.com/bytehouse-cloud/driver-go/stream"
 	"github.com/bytehouse-cloud/driver-go/stream/format"
 	"github.com/bytehouse-cloud/driver-go/utils"
@@ -35,7 +38,7 @@ type Conn interface {
 	// InsertFromReader inserts data from io.Reader
 	// Can be used for insert with files such as csv or json
 	// DataPacket will be read from the reader until io.EOF is returned as an error from reader.Read()
-	InsertFromReader(ctx context.Context, query string, reader io.Reader) error
+	InsertFromReader(ctx context.Context, query string, reader io.Reader) (int, error)
 }
 
 type Stmt interface {
@@ -83,7 +86,7 @@ func OpenConfig(config *Config) *Gateway {
 func (g *Gateway) PrepareContext(ctx context.Context, query string) (Stmt, error) {
 	insertQuery, err := utils.ParseInsertQuery(query)
 	if err != nil {
-		return nil, err
+		return nil, errors.New("PrepareContext is only valid for insertion query")
 	}
 	query = insertQuery.Query
 
@@ -124,7 +127,7 @@ func (g *Gateway) PrepareMultiConnectionInsert(ctx context.Context, query string
 // PrepareInsert returns an Insert Statement that must be closed after use.
 func (g *Gateway) PrepareInsert(ctx context.Context, query string, batchSize int) (*InsertStmt, error) {
 	// Send first query
-	if err := g.SendInsertQuery(ctx, query); err != nil {
+	if err := g.sendQuery(ctx, query); err != nil {
 		return nil, err
 	}
 
@@ -148,7 +151,7 @@ func (g *Gateway) PrepareInsert(ctx context.Context, query string, batchSize int
 
 func (g *Gateway) InsertArgs(ctx context.Context, query string, batchSize int, args ...interface{}) error {
 	if len(args) == 0 {
-		return errors.ErrorfWithCaller("nothing to insert")
+		return errors.New("nothing to insert")
 	}
 
 	stmt, err := g.PrepareInsert(ctx, query, batchSize)
@@ -197,7 +200,7 @@ func (g *Gateway) QueryContext(ctx context.Context, query string) (*QueryResult,
 func (g *Gateway) QueryContextWithExternalTableReader(ctx context.Context, query string, externalTable *ExternalTableReader) (*QueryResult, error) {
 	extTableReader, err := format.BlockStreamFmtReaderFactory(externalTable.fileType, externalTable.reader, g.Conn.GetAllSettings())
 	if err != nil {
-		return nil, errors.ErrorfWithCaller("external table reader error = %v", err)
+		return nil, fmt.Errorf("external table reader error = %v", err)
 	}
 
 	newBlock, err := data.NewBlock(externalTable.columnNames, externalTable.columnTypes, 0)
@@ -229,23 +232,26 @@ func (g *Gateway) Query(query string) (*QueryResult, error) {
 // Used before insertion of rows
 func (g *Gateway) SendInsertQuery(ctx context.Context, query string) error {
 	// make sure the insert statement is trimmed
-	if insertQuery, err := utils.ParseInsertQuery(query); err != nil {
+	insertQuery, err := utils.ParseInsertQuery(query)
+	if err != nil {
 		return err
 	} else {
 		query = insertQuery.Query
 	}
 
-	return g.sendQuery(ctx, query)
+	_, err = g.InsertFromReader(ctx, query, bytes.NewBufferString(insertQuery.Values))
+	return err
+
 }
 
-func (g *Gateway) InsertFromReader(ctx context.Context, query string, file io.Reader) error {
+func (g *Gateway) InsertFromReader(ctx context.Context, query string, file io.Reader) (int, error) {
 	qr, err := g.InsertWithDataFormatAuto(ctx, query, file)
 	if err != nil {
-		return err
+		return 0, err
 	}
 	defer qr.Close()
 
-	return qr.Exception()
+	return qr.rowsInserted, qr.Exception()
 }
 
 // InsertWithDataFormatAuto handles insert Query with data reader
@@ -255,7 +261,15 @@ func (g *Gateway) InsertWithDataFormatAuto(ctx context.Context, query string, da
 		return nil, err
 	}
 
-	return g.InsertWithData(ctx, query, dataReader, iq.DataFmt, settings.DEFAULT_INSERT_BLOCK_SIZE)
+	blockSize := settings.DEFAULT_BLOCK_SIZE
+	if bytehouseCtx, ok := ctx.(*bytehouse.QueryContext); ok {
+		clientSetting := bytehouseCtx.GetQuerySettings()
+		if declBlockSize, ok := clientSetting[bytehouse.InsertBlockSize]; ok {
+			blockSize = declBlockSize.(int)
+		}
+	}
+
+	return g.InsertWithData(ctx, query, dataReader, iq.DataFmt, blockSize)
 }
 
 func (g *Gateway) InsertWithData(ctx context.Context, query string, dataReader io.Reader, dataFmt string, blockSize int) (*QueryResult, error) {
@@ -275,7 +289,7 @@ func (g *Gateway) InsertWithData(ctx context.Context, query string, dataReader i
 	qr := NewInsertQueryResult(respStreamForResult)
 
 	defer close(respStreamForResult)
-	_, err = stream.HandleInsertFromFmtStream(ctx,
+	rowsInserted, err := stream.HandleInsertFromFmtStream(ctx,
 		g.Conn.GetResponseStream(ctx), blockStreamReader,
 		g.Conn.SendClientData, g.Conn.Cancel,
 		func(resp response.Packet) {
@@ -284,6 +298,7 @@ func (g *Gateway) InsertWithData(ctx context.Context, query string, dataReader i
 		stream.OptionBatchSize(blockSize),
 		stream.OptionAddLogf(g.Conn.Log),
 	)
+	qr.rowsInserted = rowsInserted
 
 	if qr.err == nil {
 		qr.err = err
@@ -300,6 +315,13 @@ func (g *Gateway) listenCtxDone(ctx context.Context) func() {
 
 	finishSig := make(chan struct{})
 	go func() {
+		defer func() {
+			if r := recover(); r != nil {
+				log.Printf("A runtime panic has occurred with err = [%s],  stacktrace = [%s]\n",
+					r,
+					string(debug.Stack()))
+			}
+		}()
 		select {
 		case <-done:
 			g.Conn.Cancel()
@@ -317,7 +339,13 @@ func (g *Gateway) listenCtxDone(ctx context.Context) func() {
 // Must be used by all exported Query functions
 func (g *Gateway) applySettingsFromCtx(ctx context.Context) func() {
 	if queryContext, ok := ctx.(*bytehouse.QueryContext); ok {
-		return g.applySettingsTemporarily(queryContext)
+		g.applyConnConfigs(queryContext.GetPersistentConnConfigs())
+		revertConnConfigs := g.applyConnConfigsTemporarily(queryContext.GetTemporaryConnConfigs())
+		revertQuerySettings := g.applySettingsTemporarily(queryContext.GetQuerySettings())
+		return func() {
+			revertConnConfigs()
+			revertQuerySettings()
+		}
 	}
 	return func() {}
 }
@@ -353,8 +381,12 @@ func (g *Gateway) sendQueryWithExternalTable(ctx context.Context, query string, 
 }
 
 func (g *Gateway) sendQueryWithExternalTableStream(ctx context.Context, query string, extTableStream <-chan *data.Block, extTableName string) error {
+	var queryID string
+	if queryContext, ok := ctx.(*bytehouse.QueryContext); ok {
+		queryID = queryContext.GetQueryID()
+	}
 	defer g.applySettingsFromCtx(ctx)()
-	return g.Conn.SendQueryFull(query, "", extTableStream, extTableName)
+	return g.Conn.SendQueryFull(query, queryID, extTableStream, extTableName)
 }
 
 // Ping exposed for SDK directly
@@ -367,8 +399,16 @@ func (g *Gateway) Close() error {
 	return g.Conn.Close()
 }
 
-func (g *Gateway) applySettingsTemporarily(ctx *bytehouse.QueryContext) func() {
-	return g.Conn.AddSettingsTemporarily(ctx.GetQuerySettings())
+func (g *Gateway) applySettingsTemporarily(m map[string]interface{}) func() {
+	return g.Conn.AddSettingsTemporarily(m)
+}
+
+func (g *Gateway) applyConnConfigs(m map[string]interface{}) {
+	g.Conn.ApplyConnConfigs(m)
+}
+
+func (g *Gateway) applyConnConfigsTemporarily(m map[string]interface{}) func() {
+	return g.Conn.ApplyConnConfigsTemporarily(m)
 }
 
 func (g *Gateway) Clone() *Gateway {

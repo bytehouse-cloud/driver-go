@@ -3,6 +3,7 @@ package helper
 import (
 	"bytes"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"io"
 
@@ -12,12 +13,21 @@ import (
 
 const backSlash = '\\'
 
-func ReadCHElemTillStop(w Writer, z *bytepool.ZReader, col *column.CHColumn, stop byte) error {
-	switch col.Data.(type) {
+const (
+	errReadArrayMatchCloseSquareBracket = "fail to find match close square brackets"
+	errReadMapMatchCloseCurlyBracket    = "fail to find match close curly brackets"
+)
+
+func ReadCHElemTillStop(w Writer, z *bytepool.ZReader, col column.CHColumnData, stop byte) error {
+	switch data := col.(type) {
 	case *column.StringColumnData, *column.FixedStringColumnData:
 		return readString(w, z, stop)
 	case *column.ArrayColumnData:
 		return readArray(w, z)
+	case *column.MapColumnData:
+		return readMap(w, z)
+	case *column.NullableColumnData:
+		return ReadCHElemTillStop(w, z, data.GetInnerColumnData(), stop)
 	default:
 		return readRawTillStop(w, z, stop)
 	}
@@ -70,6 +80,14 @@ func readArray(w Writer, z *bytepool.ZReader) error {
 	squareBraceCount := 1
 	for {
 		b, err = z.ReadByte()
+		if err != nil {
+			if err == io.EOF {
+				err = errors.New(errReadArrayMatchCloseSquareBracket)
+			}
+
+			return err
+		}
+
 		switch b {
 		case backTick, doubleQuote, singleQuote:
 			w.WriteByte(b)
@@ -98,6 +116,46 @@ func readArray(w Writer, z *bytepool.ZReader) error {
 	return nil
 }
 
+func readMap(w Writer, z *bytepool.ZReader) error {
+	b, err := ReadNextNonSpaceByte(z)
+	if b != curlyOpenBrace {
+		z.UnreadCurrentBuffer(1) // if not curly square bracket then current value should be empty string ""
+		return err
+	}
+
+	w.WriteByte(curlyOpenBrace)
+	curlyBraceCount := 1
+	for {
+		b, err = z.ReadByte()
+		if err != nil {
+			if err == io.EOF {
+				err = errors.New(errReadMapMatchCloseCurlyBracket)
+			}
+
+			return err
+		}
+
+		switch b {
+		case backTick, doubleQuote, singleQuote:
+			w.WriteByte(b)
+			err := readStringUntilByteEscaped(w, z, b)
+			if err != nil {
+				return err
+			}
+		case curlyOpenBrace:
+			curlyBraceCount++
+		case curlyCloseBrace:
+			curlyBraceCount--
+		}
+		w.WriteByte(b)
+
+		if curlyBraceCount == 0 {
+			break
+		}
+	}
+	return nil
+}
+
 // readStringUntilByteEscaped is the same as ReadStringUntilByte, however backslash character is handled as escaped
 func readStringUntilByteEscaped(w Writer, z *bytepool.ZReader, b byte) error {
 	var yieldFromBuilder func(w Writer) error
@@ -116,6 +174,9 @@ func readStringUntilByteEscaped(w Writer, z *bytepool.ZReader, b byte) error {
 		z.UnreadCurrentBuffer(len(buf) - pos - 1) // pause reading for processing of stop characters
 
 		if isBackSlash {
+			// this will store the buffer until last backslash
+			bufUntilLastBackSlash := buf[:pos]
+
 			escapedBuf := make([]byte, 3)
 			n, ok := readBytesAfterEscape(z, escapedBuf, b)
 			resultBuf := escapedBuf[:n]
@@ -126,6 +187,11 @@ func readStringUntilByteEscaped(w Writer, z *bytepool.ZReader, b byte) error {
 					return nil
 				}
 			}
+
+			// lets not forget to append the content until last backslash
+			w.Write(bufUntilLastBackSlash)
+
+			// write the escape byte
 			w.Write(escapedBuf[:n])
 			return yieldFromBuilder(w) //  read again after handling escape
 		}
@@ -277,6 +343,39 @@ func findNonSpace(buf []byte) int {
 	for i = 0; i < len(buf); i++ {
 		switch buf[i] {
 		case '\n', '\t', '\f', '\r', '\v', ' ':
+			continue
+		}
+
+		break
+	}
+	return i
+}
+
+func ReadNextNonSpaceExceptNewLineByte(z *bytepool.ZReader) (byte, error) {
+	buf, err := z.ReadNextBuffer()
+	if err != nil {
+		return 0, err
+	}
+
+	var i int
+	for i = findNonSpaceExceptNewLine(buf); i == len(buf); i = findNonSpaceExceptNewLine(buf) {
+		if buf, err = z.ReadNextBuffer(); err != nil {
+			return 0, err
+		}
+	}
+
+	z.UnreadCurrentBuffer(len(buf) - i - 1)
+	return buf[i], nil
+}
+
+// findNonSpaceExceptNewLine attempts to find the index of the first non space byte that occurs the columnTextsPool.
+// returns len(buf) buf only contains space.
+// definition of space byte is any of the following:  `\t` `\v` `\f` `\zReader` ` `
+func findNonSpaceExceptNewLine(buf []byte) int {
+	var i int
+	for i = 0; i < len(buf); i++ {
+		switch buf[i] {
+		case '\t', '\f', '\r', '\v', ' ':
 			continue
 		}
 

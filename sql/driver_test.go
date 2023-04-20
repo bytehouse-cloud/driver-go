@@ -343,7 +343,7 @@ func TestBasicArgsQuery(t *testing.T) {
 	assertEqual(t, guitarist, true)
 	assertEqual(t, height, 123.45)
 
-	assertEqualTime(t, birthday, myTime) // We gave a timestamp with assumed UTC0, so this is correct.
+	assertEqualTime(t, birthday.Local(), myTime.Local()) // Compare both times in local
 	assertNoNext(t, rows)
 
 	//-----------------------------------------------------------------------------------------
@@ -699,8 +699,8 @@ func Test_InsertCommonTypes(t *testing.T) {
 		assertEqual(t, refData.String, data.String)
 		assertEqual(t, refData.FixedString, data.FixedString)
 		assertEqualDate(t, refData.Date, data.Date)
-		assertEqualTime(t, refData.DateTime, data.DateTime)
-		assertEqualTime(t, refData.DateTime64, data.DateTime64)
+		assertEqualTime(t, refData.DateTime.Local(), data.DateTime.Local())
+		assertEqualTime(t, refData.DateTime64.Local(), data.DateTime64.Local())
 		assertTrue(t, refData.Ipv4.Equal(data.Ipv4))
 		assertTrue(t, refData.Ipv6.Equal(data.Ipv6))
 	}
@@ -2237,7 +2237,8 @@ func Test_InsertFromReader(t *testing.T) {
 
 			// Run insert query
 			err = RunConn(ctx, g, func(conn sdk.Conn) error {
-				return conn.InsertFromReader(ctx, tt.insertQuery, file)
+				_, err := conn.InsertFromReader(ctx, tt.insertQuery, file)
+				return err
 			})
 			require.NoError(b, err)
 

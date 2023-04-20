@@ -16,7 +16,8 @@ const float32ByteSize = 4
 // Float32ColumnData handles float32 column types
 // Float32ColumnData doesn't guarantee precision of values larger then MaxFloat32
 type Float32ColumnData struct {
-	raw []byte
+	raw      []byte
+	isClosed bool
 }
 
 func (f *Float32ColumnData) ReadFromDecoder(decoder *ch_encoding.Decoder) error {
@@ -92,6 +93,10 @@ func (f *Float32ColumnData) Len() int {
 }
 
 func (f *Float32ColumnData) Close() error {
+	if f.isClosed {
+		return nil
+	}
+	f.isClosed = true
 	bytepool.PutBytes(f.raw)
 	return nil
 }

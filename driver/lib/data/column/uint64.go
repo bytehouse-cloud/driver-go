@@ -11,7 +11,8 @@ import (
 )
 
 type UInt64ColumnData struct {
-	raw []byte
+	raw      []byte
+	isClosed bool
 }
 
 const uint64ByteSize = 8
@@ -99,6 +100,10 @@ func (u *UInt64ColumnData) Len() int {
 }
 
 func (u *UInt64ColumnData) Close() error {
+	if u.isClosed {
+		return nil
+	}
+	u.isClosed = true
 	bytepool.PutBytes(u.raw)
 	return nil
 }

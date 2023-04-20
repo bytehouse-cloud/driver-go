@@ -81,9 +81,16 @@ func (c *CSVBlockStreamFmtReader) readElem(fb *bytepool.FrameBuffer, col *column
 		err error
 	)
 
-	b, err = helper.ReadNextNonSpaceByte(c.zReader)
-	if err != nil {
-		return err
+	if last {
+		b, err = helper.ReadNextNonSpaceExceptNewLineByte(c.zReader)
+		if err != nil {
+			return err
+		}
+	} else {
+		b, err = helper.ReadNextNonSpaceByte(c.zReader)
+		if err != nil {
+			return err
+		}
 	}
 
 	var quoted bool
@@ -170,7 +177,7 @@ func (c *CSVBlockStreamFmtReader) readElemWithoutQuote(fb *bytepool.FrameBuffer,
 		return c.readLastElemWithoutQuote(fb)
 	}
 
-	return helper.ReadCHElemTillStop(fb, c.zReader, col, c.delimiter)
+	return helper.ReadCHElemTillStop(fb, c.zReader, col.Data, c.delimiter)
 }
 
 func (c *CSVBlockStreamFmtReader) readLastElemWithoutQuote(fb *bytepool.FrameBuffer) error {

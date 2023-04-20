@@ -234,7 +234,7 @@ func TestGateway_Insert(t *testing.T) {
 			teardownQuery: "DROP TABLE IF EXISTS sample_table",
 			args: args{
 				ctx:   context.Background(),
-				query: "INSERT INTO sample_table VALUES (?, ?)",
+				query: "INSERT INTO sample_table VALUES",
 				args:  [][]interface{}{{uint32(1), "red"}},
 			},
 			compareFunc: func(t *testing.T, expected, result []interface{}) {
@@ -255,7 +255,7 @@ func TestGateway_Insert(t *testing.T) {
 			},
 			args: args{
 				ctx:   context.Background(),
-				query: "INSERT INTO sample_table VALUES (?, ?)",
+				query: "INSERT INTO sample_table VALUES",
 				args: [][]interface{}{
 					{uint32(1), "red"},
 					{uint32(2), "re"},
@@ -306,24 +306,7 @@ func TestGateway_Insert(t *testing.T) {
 				string,
 				fString,
 				uuid
-			) VALUES (
-				?,
-				?,
-				?,
-				?,
-				?,
-				?,
-				?,
-				?,
-				?,
-				?,
-				?,
-				?,
-				?,
-				?,
-				?,
-				?
-			)`,
+			) VALUES`,
 				args: func() (ret [][]interface{}) {
 					for i := 1; i <= 10; i++ {
 						ret = append(ret, []interface{}{
@@ -375,10 +358,7 @@ func TestGateway_Insert(t *testing.T) {
 				query: `INSERT INTO clickhouse_test_insert (
 				ipv4,
 				ipv6
-			) VALUES (
-				?,
-				?
-			)`,
+			) VALUES`,
 				args: func() (ret [][]interface{}) {
 					for i := 1; i <= 10; i++ {
 						ret = append(ret, []interface{}{
@@ -471,23 +451,7 @@ func TestGateway_Insert(t *testing.T) {
 				fString,
 				enum8,
 				enum16
-			) VALUES (
-				?,
-				?,
-				?,
-				?,
-				?,
-				?,
-				?,
-				?,
-				?,
-				?,
-				?,
-				?
-				?,
-				?
-			)
-		`,
+			) VALUES`,
 				args: func() (ret [][]interface{}) {
 					for i := 1; i <= 10; i++ {
 						ret = append(ret,
@@ -600,10 +564,7 @@ func TestGateway_Insert(t *testing.T) {
 				query: `
 			INSERT INTO clickhouse_test_tuple (
 				t
-			) VALUES (
-				?
-			)
-		`,
+			) VALUES`,
 				args: func() (ret [][]interface{}) {
 					for i := 1; i <= 10; i++ {
 						ret = append(ret,
@@ -655,11 +616,7 @@ func TestGateway_Insert(t *testing.T) {
 				date,
 				datetime,
 				datetime64
-			) VALUES (
-				?,
-				?,
-				?
-			)`,
+			) VALUES`,
 				args: func() (ret [][]interface{}) {
 					for i := 1; i <= 10; i++ {
 						ret = append(ret, []interface{}{
@@ -692,9 +649,7 @@ func TestGateway_Insert(t *testing.T) {
 				ctx: context.Background(),
 				query: `INSERT INTO clickhouse_test_decimal (
 				decimal
-			) VALUES (
-				?
-			)`,
+			) VALUES`,
 				args: func() (ret [][]interface{}) {
 					for i := 1; i <= 10; i++ {
 						ret = append(ret, []interface{}{
@@ -727,10 +682,7 @@ func TestGateway_Insert(t *testing.T) {
 				query: `INSERT INTO clickhouse_test_lowCardinality (
 				lowCardinality1,
 				lowCardinality2
-			) VALUES (
-				?,
-				?
-			)`,
+			) VALUES`,
 				args: func() (ret [][]interface{}) {
 					for i := 1; i <= 10; i++ {
 						ret = append(ret, []interface{}{
@@ -763,10 +715,7 @@ func TestGateway_Insert(t *testing.T) {
 				query: `INSERT INTO clickhouse_test_map (
 				map1,
 				map2
-			) VALUES (
-				?,
-				?
-			)`,
+			) VALUES`,
 				args: func() (ret [][]interface{}) {
 					for i := 1; i <= 10; i++ {
 						ret = append(ret, []interface{}{

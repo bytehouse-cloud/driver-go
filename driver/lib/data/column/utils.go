@@ -27,6 +27,9 @@ const (
 	listSeparator = ", "
 	mapSeparator  = ":"
 	enumSeparator = "="
+
+	localtime = "localtime"
+	local     = "Local"
 )
 
 // commaIterator takes in a string to create a string iterator which separates whole string by comma
@@ -34,20 +37,21 @@ const (
 // If end is reached, returns empty string and false
 // Note: takes into account square brackets, round bracket, escape character, single quote, back quote and double quote
 // eg.
-// 	s := "[a,d,f,f], dfsdfsd,fsdfsdf,sdfd"
-//	iter := parseUntilCommaOrEOF2(s)
-//	for {
-//		s, ok := iter()
-//		if !ok {
-//			break
+//
+//		s := "[a,d,f,f], dfsdfsd,fsdfsdf,sdfd"
+//		iter := parseUntilCommaOrEOF2(s)
+//		for {
+//			s, ok := iter()
+//			if !ok {
+//				break
+//			}
+//			fmt.Println(s)
 //		}
-//		fmt.Println(s)
-//	}
-//  // output:
-//  // [a,d,f,f]
-//  // dfsdfsd
-//  // fsdfsdf
-//  // sdfd
+//	 // output:
+//	 // [a,d,f,f]
+//	 // dfsdfsd
+//	 // fsdfsdf
+//	 // sdfd
 func commaIterator(s string) func() (string, bool) {
 	var (
 		escaped                                                  bool
@@ -138,11 +142,11 @@ func splitIgnoreBraces(src string, separator byte, bufferReuse []string) []strin
 		case escape:
 			currentIdx++
 		case squareOpenBracket:
-			currentIdx += 1 + indexTillByteOrEOF(src[currentIdx+1:], squareCloseBracket)
+			currentIdx += indexOfMatchCloseBracket(src[currentIdx:], squareOpenBracket, squareCloseBracket)
 		case roundOpenBracket:
-			currentIdx += 1 + indexTillByteOrEOF(src[currentIdx+1:], roundCloseBracket)
+			currentIdx += indexOfMatchCloseBracket(src[currentIdx:], roundOpenBracket, roundCloseBracket)
 		case curlyOpenBracket:
-			currentIdx += 1 + indexTillByteOrEOF(src[currentIdx+1:], curlyCloseBracket)
+			currentIdx += indexOfMatchCloseBracket(src[currentIdx:], curlyOpenBracket, curlyCloseBracket)
 		case singleQuote, doubleQuote, backQuote:
 			currentIdx += 1 + indexTillByteOrEOF(src[currentIdx+1:], c)
 		case separator:
@@ -156,6 +160,38 @@ func splitIgnoreBraces(src string, separator byte, bufferReuse []string) []strin
 	bufferReuse = append(bufferReuse, strings.TrimSpace(src[lastIdx:]))
 
 	return bufferReuse
+}
+
+// Given s[0] is equal to openBracket,
+// indexOfMatchCloseBracket find the position i that s[i] == closeBracket that if we only keeps those brackets from s[0:i+1],
+// that string will be balanced bracket
+// if can't find any index, return len(s) - 1;
+func indexOfMatchCloseBracket(s string, openBracket byte, closeBracket byte) int {
+	openCount := 0
+	isEscape := false
+	for i := 0; i < len(s); i++ {
+		if s[i] == escape {
+			isEscape = true
+			continue
+		}
+
+		if s[i] == openBracket && !isEscape {
+			openCount++
+			isEscape = false
+			continue
+		}
+		if s[i] == closeBracket && !isEscape {
+			openCount--
+		}
+
+		if openCount == 0 {
+			return i
+		}
+
+		isEscape = false
+	}
+
+	return len(s) - 1
 }
 
 // indexTillByteOrEOF return the position where next byte occur or EOF.
@@ -216,6 +252,9 @@ func getDateTimeLocation(t CHColumnType) (*time.Location, error) {
 		return nil, nil
 	}
 	tzString := string(t[10 : len(t)-2]) // DateTime('Europe/Moscow')
+	if tzString == localtime {
+		tzString = local
+	}
 	location, err := time.LoadLocation(tzString)
 	if err != nil {
 		return nil, err
@@ -223,20 +262,38 @@ func getDateTimeLocation(t CHColumnType) (*time.Location, error) {
 	return location, nil
 }
 
-func getDateTime64Param(t CHColumnType) (int, *time.Location, error) {
-	params := strings.Split(string(t[11:len(t)-1]), ", ") // DateTime64(23, timestamp), e.g. DateTime64(3, 'Europe/Moscow')
-	precision, err := strconv.ParseUint(params[0], 10, 32)
+func parseDateTime64Param(t CHColumnType) (int, string, error) {
+	params := strings.Split(string(t[11:len(t)-1]), ",") // DateTime64(23, timestamp), e.g. DateTime64(3, 'Europe/Moscow')
+	precisionString := strings.TrimSpace(params[0])
+	if len(precisionString) == 0 {
+		return 0, "", nil
+	}
+	precision, err := strconv.ParseUint(precisionString, 10, 32)
 	if err != nil {
-		return 0, nil, err
+		return 0, "", err
 	}
 	if len(params) == 1 {
-		return int(precision), nil, nil
+		return int(precision), "", nil
 	}
-	tz, err := time.LoadLocation(strings.Trim(params[1], "'"))
+	tzString := strings.Trim(strings.TrimSpace(params[1]), "'")
+	return int(precision), tzString, nil
+}
+
+func getDateTime64Param(t CHColumnType) (int, *time.Location, error) {
+
+	precision, tzString, err := parseDateTime64Param(t)
 	if err != nil {
 		return 0, nil, err
 	}
-	return int(precision), tz, nil
+
+	if tzString == localtime {
+		tzString = local
+	}
+	tz, err := time.LoadLocation(tzString)
+	if err != nil {
+		return 0, nil, err
+	}
+	return precision, tz, nil
 }
 
 func getColumnValuesUsingOffset(start, end int, columnData CHColumnData) []interface{} {

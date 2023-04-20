@@ -127,6 +127,24 @@ func Test_splitIgnoreBraces(t *testing.T) {
 			},
 			want: []string{"Map(String, UInt8)", "UInt8", "Map(String, String)", "Koo Koo Koo"},
 		},
+		{
+			name: "Split nested round brackets, square brackets, curly brackets  properly",
+			args: args{
+				src:         "[[[1,2,3],[1,2]]],[[1,2],[2,3]],[1,4,5,3],  (((1,2,3,4))),  {{'nmba':'25042003','tai':'26072000'}}",
+				separator:   ',',
+				bufferReuse: nil,
+			},
+			want: []string{"[[[1,2,3],[1,2]]]", "[[1,2],[2,3]]", "[1,4,5,3]", "(((1,2,3,4)))", "{{'nmba':'25042003','tai':'26072000'}}"},
+		},
+		{
+			name: "Split Array of string with bracket as part of the string",
+			args: args{
+				src:         "['\\[\\nmba', '\\[\\]25042003'], [['\\]tai', '\\[\\]26072000']]",
+				separator:   ',',
+				bufferReuse: nil,
+			},
+			want: []string{"['\\[\\nmba', '\\[\\]25042003']", "[['\\]tai', '\\[\\]26072000']]"},
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -316,7 +334,7 @@ func Test_getDateTime64Param(t *testing.T) {
 				t: "DateTime64(10)",
 			},
 			wantPrecision: 10,
-			wantLocation:  nil,
+			wantLocation:  time.UTC,
 		},
 		{
 			name: "Test if have location can get location",

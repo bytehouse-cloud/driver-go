@@ -3,6 +3,7 @@ package sdk
 import (
 	"context"
 	"fmt"
+	"strconv"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -30,7 +31,7 @@ func TestMultiInsertStatement(t *testing.T) {
 
 	numRows := int(1e5)
 	for i := 0; i < numRows; i++ {
-		err = stmt.ExecContext(ctx, int32(4), "eee")
+		err = stmt.ExecContext(ctx, int32(i), strconv.Itoa(i))
 		require.NoError(t, err, "execContext error:", err)
 	}
 	err = stmt.Close()

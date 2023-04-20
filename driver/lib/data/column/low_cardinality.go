@@ -35,6 +35,8 @@ type LowCardinalityColumnData struct {
 	generateKeys    GenerateColumnData
 	keys            CHColumnData
 	valueIndicesRaw []byte
+	isNullableCol   bool
+	isClosed        bool
 
 	getIndex func(row int) uint
 	putIndex func(row int, idx uint)
@@ -98,13 +100,12 @@ func (l *LowCardinalityColumnData) ReadFromDecoder(decoder *ch_encoding.Decoder)
 	if _, err := decoder.Read(l.header[:]); err != nil {
 		return err
 	}
-
 	numKeys := binary.LittleEndian.Uint64(l.header[16:])
 	l.keys = l.generateKeys(int(numKeys))
+
 	if err := l.keys.ReadFromDecoder(decoder); err != nil {
 		return err
 	}
-
 	numIndices, err := decoder.UInt64()
 	if err != nil {
 		return err
@@ -141,8 +142,12 @@ func (l *LowCardinalityColumnData) GetValue(row int) interface{} {
 	if l.getIndex == nil {
 		return l.Zero()
 	}
+	index := int(l.getIndex(row))
 
-	return l.keys.GetValue(int(l.getIndex(row)))
+	if l.isNullableCol && index == 0 {
+		return nil
+	}
+	return l.keys.GetValue(index)
 }
 
 func (l *LowCardinalityColumnData) GetString(row int) string {
@@ -150,7 +155,13 @@ func (l *LowCardinalityColumnData) GetString(row int) string {
 		return l.ZeroString()
 	}
 
-	return l.keys.GetString(int(l.getIndex(row)))
+	index := int(l.getIndex(row))
+
+	if l.isNullableCol && index == 0 {
+		return NULLDisplay
+	}
+
+	return l.keys.GetString(index)
 }
 
 func (l *LowCardinalityColumnData) Zero() interface{} {
@@ -169,6 +180,10 @@ func (l *LowCardinalityColumnData) Close() error {
 	if l.keys == nil {
 		return nil
 	}
+	if l.isClosed {
+		return nil
+	}
+	l.isClosed = true
 	bytepool.PutBytes(l.valueIndicesRaw)
 	return l.keys.Close()
 }
@@ -178,17 +193,20 @@ func (l *LowCardinalityColumnData) ReadFromValues(values []interface{}) (int, er
 		return 0, nil
 	}
 
-	var (
-		curIndex  uint
-		keyValues []interface{}
-		// unique values to uint map
-		indexByValue map[interface{}]uint
-	)
-
 	indices := make([]uint, len(values))
-	indexByValue = make(map[interface{}]uint)
+	indexByValue := make(map[interface{}]uint)
+
+	var curIndex uint
+	if l.isNullableCol {
+		curIndex = 1 // index 0 represents nil
+	}
 
 	for i, value := range values {
+		if value == nil && l.isNullableCol {
+			indices[i] = 0
+			continue
+		}
+
 		idx, ok := indexByValue[value]
 		if !ok {
 			indexByValue[value] = curIndex
@@ -199,7 +217,12 @@ func (l *LowCardinalityColumnData) ReadFromValues(values []interface{}) (int, er
 	}
 
 	// all keys in indexByValue
-	keyValues = make([]interface{}, len(indexByValue))
+	length := len(indexByValue)
+	if l.isNullableCol {
+		length = length + 1
+	}
+	keyValues := make([]interface{}, length)
+	// keys and values
 	for value, i := range indexByValue {
 		keyValues[i] = value
 	}
@@ -242,11 +265,20 @@ func (l *LowCardinalityColumnData) ReadFromTexts(texts []string) (int, error) {
 		return 0, nil
 	}
 
-	indexByText := make(map[string]uint)
 	indices := make([]uint, len(texts))
+	indexByText := make(map[string]uint)
 
 	var curIndex uint
+	if l.isNullableCol {
+		curIndex = 1 // index 0 represents nil
+	}
+
 	for i, text := range texts {
+		if isNull(text) && l.isNullableCol {
+			indices[i] = 0
+			continue
+		}
+
 		idx, ok := indexByText[text]
 		if !ok {
 			indexByText[text] = curIndex
@@ -256,7 +288,12 @@ func (l *LowCardinalityColumnData) ReadFromTexts(texts []string) (int, error) {
 		indices[i] = idx
 	}
 
-	keyTexts := make([]string, len(indexByText))
+	length := len(indexByText)
+	if l.isNullableCol {
+		length = length + 1
+	}
+	keyTexts := make([]string, length)
+
 	for text, i := range indexByText {
 		keyTexts[i] = text
 	}

@@ -2,6 +2,8 @@ package format
 
 import (
 	"io"
+	"log"
+	"runtime/debug"
 	"strings"
 
 	"github.com/jfcg/sixb"
@@ -41,6 +43,13 @@ func (c *CSVBlockStreamFmtWriter) BlockStreamFmtWrite(blockStream <-chan *data.B
 }
 
 func (c *CSVBlockStreamFmtWriter) blockStreamFmtWrite(blockStream <-chan *data.Block) {
+	defer func() {
+		if r := recover(); r != nil {
+			log.Printf("A runtime panic has occurred with err = [%s],  stacktrace = [%s]\n",
+				r,
+				string(debug.Stack()))
+		}
+	}()
 	defer func() {
 		c.done <- struct{}{}
 	}()

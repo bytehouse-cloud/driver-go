@@ -11,7 +11,8 @@ import (
 const int16ByteSize = 2
 
 type Int16ColumnData struct {
-	raw []byte
+	raw      []byte
+	isClosed bool
 }
 
 func (i *Int16ColumnData) ReadFromDecoder(decoder *ch_encoding.Decoder) error {
@@ -96,6 +97,10 @@ func (i *Int16ColumnData) Len() int {
 }
 
 func (i *Int16ColumnData) Close() error {
+	if i.isClosed {
+		return nil
+	}
+	i.isClosed = true
 	bytepool.PutBytes(i.raw)
 	return nil
 }

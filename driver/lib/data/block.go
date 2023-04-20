@@ -208,6 +208,16 @@ func (b *Block) WriteToStrings(frame [][]string) {
 	return
 }
 
+func (b *Block) WriteValuesAsString(frame [][]interface{}) {
+	for i := 0; i < b.NumRows; i++ {
+		row := frame[i]
+		for j := range row {
+			row[j] = b.Columns[j].Data.GetString(i)
+		}
+	}
+	return
+}
+
 // WriteToStringsV2  is similar to WriteToStrings but using the boundaries of the given
 // frame instead of boundaries of block.
 func (b *Block) WriteToStringsV2(frame [][]string) {

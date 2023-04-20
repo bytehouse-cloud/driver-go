@@ -27,15 +27,36 @@ type CHConn struct {
 }
 
 func (c *CHConn) Begin() (driver.Tx, error) {
+	if c.Gateway.Closed() {
+		return nil, driver.ErrBadConn
+	}
+
+	_, _ = c.Exec("SET enable_interactive_transaction=1", []driver.Value{})
+	_, _ = c.Exec("BEGIN", []driver.Value{})
 	return c, nil
 }
 
 func (c *CHConn) Commit() error {
-	return nil
+	if c == nil || c.Gateway.Closed() {
+		return errors.New("invalid connection")
+	}
+
+	_, _ = c.Exec("COMMIT", []driver.Value{})
+	return c.Close()
 }
 
 func (c *CHConn) Rollback() error {
-	return nil
+	if c == nil || c.Gateway.Closed() {
+		return errors.New("invalid connection")
+	}
+
+	_, err := c.Exec("ROLLBACK", []driver.Value{})
+	if err != nil {
+		return err
+	}
+
+	return c.Close()
+
 }
 
 // ResetSession is called prior to executing a query on the connection

@@ -1,6 +1,7 @@
 package conn
 
 import (
+	"bufio"
 	"crypto/tls"
 	errors2 "errors"
 	"net"
@@ -25,6 +26,8 @@ func dial(configs *ConnConfig) (*connect, error) {
 		conn  net.Conn
 		ident = abs(int(atomic.AddInt32(&tick, 1)))
 	)
+
+	// set empty tls config
 	tlsConfig := configs.tlsConfig
 	if configs.secure {
 		if tlsConfig == nil {
@@ -36,6 +39,8 @@ func dial(configs *ConnConfig) (*connect, error) {
 		return nil, ErrNoHost
 	}
 
+	// loop through all the give host and attempt to connect any of them
+	// order of connection is given by client
 	checkedHosts := make(map[int]struct{}, len(configs.hosts))
 	for i := range configs.hosts {
 		var num int
@@ -52,20 +57,24 @@ func dial(configs *ConnConfig) (*connect, error) {
 			}
 			checkedHosts[num] = struct{}{}
 		}
+
+		// use tls if secure flag is used
 		switch {
 		case configs.secure:
 			conn, err = tls.DialWithDialer(
 				&net.Dialer{
-					Timeout: configs.connTimeout,
+					Timeout: time.Duration(configs.connTimeoutSeconds) * time.Second,
 				},
 				"tcp",
 				configs.hosts[num],
 				tlsConfig,
 			)
 		default:
-			conn, err = net.DialTimeout("tcp", configs.hosts[num], configs.connTimeout)
+			conn, err = net.DialTimeout("tcp", configs.hosts[num], time.Duration(configs.connTimeoutSeconds)*time.Second)
 		}
+
 		if err == nil {
+			// log which idx and address being used
 			configs.logf(
 				"[dial] secure=%t, skip_verify=%t, strategy=%s, ident=%d, server=%d -> %s",
 				configs.secure,
@@ -81,38 +90,43 @@ func dial(configs *ConnConfig) (*connect, error) {
 					return nil, err
 				}
 			}
-
+			// return successful connection
 			return &connect{
-				Conn:         conn,
-				logf:         configs.logf,
-				ident:        ident,
-				zReader:      bytepool.NewZReaderDefault(NewRefreshReader(conn, configs.readTimeout)),
-				writeTimeout: configs.writeTimeout,
+				Conn:           conn,
+				logf:           configs.logf,
+				ident:          ident,
+				sendTimeout:    time.Duration(configs.sendTimeoutSeconds) * time.Second,
+				receiveTimeout: time.Duration(configs.receiveTimeoutSeconds) * time.Second,
+				zReader:        bytepool.NewZReaderDefault(NewRefreshReader(conn, time.Duration(configs.receiveTimeoutSeconds)*time.Second)),
+				bWriter:        bufio.NewWriter(conn),
 			}, nil
-		} else {
-			configs.logf(
-				"[dial err] secure=%t, skip_verify=%t, strategy=%s, ident=%d, addr=%s\n%#v\n",
-				configs.secure,
-				configs.skipVerify,
-				configs.dialStrategy,
-				ident,
-				configs.hosts[num],
-				err,
-			)
 		}
+
+		// log error and try another host
+		configs.logf(
+			"[dial err] secure=%t, skip_verify=%t, strategy=%s, ident=%d, addr=%s\n%#v\n",
+			configs.secure,
+			configs.skipVerify,
+			configs.dialStrategy,
+			ident,
+			configs.hosts[num],
+			err,
+		)
 	}
 
+	// no more host to try, return final error
 	return nil, err
 }
 
 type connect struct {
 	net.Conn
-	logf         func(string, ...interface{})
-	ident        int
-	closed       bool
-	readTimeout  time.Duration
-	writeTimeout time.Duration
-	zReader      *bytepool.ZReader
+	logf           func(string, ...interface{})
+	ident          int
+	closed         bool
+	receiveTimeout time.Duration
+	sendTimeout    time.Duration
+	zReader        *bytepool.ZReader
+	bWriter        *bufio.Writer
 }
 
 func (conn *connect) Read(b []byte) (int, error) {
@@ -124,29 +138,22 @@ func (conn *connect) ReadUvarint() (uint64, error) {
 	return conn.zReader.ReadUvarint()
 }
 
-func (conn *connect) resetReadTimeout() {
-	conn.SetReadDeadline(time.Now().Add(conn.readTimeout))
+func (conn *connect) resetReceiveTimeout() {
+	conn.SetReadDeadline(time.Now().Add(conn.receiveTimeout))
 }
 
 func (conn *connect) Write(b []byte) (int, error) {
-	defer conn.resetWriteTimeout()
-	var (
-		n      int
-		err    error
-		total  int
-		srcLen = len(b)
-	)
-	for total < srcLen {
-		if n, err = conn.Conn.Write(b[total:]); err != nil {
-			return n, err
-		}
-		total += n
-	}
-	return n, nil
+	return conn.bWriter.Write(b)
 }
 
-func (conn *connect) resetWriteTimeout() {
-	conn.SetWriteDeadline(time.Now().Add(conn.writeTimeout))
+func (conn *connect) Flush() error {
+	defer conn.resetSendTimeout()
+	defer conn.resetReceiveTimeout()
+	return conn.bWriter.Flush()
+}
+
+func (conn *connect) resetSendTimeout() {
+	conn.SetWriteDeadline(time.Now().Add(conn.sendTimeout))
 }
 
 func (conn *connect) Close() error {
@@ -158,6 +165,18 @@ func (conn *connect) Close() error {
 		return err
 	}
 
+	if err := conn.zReader.Close(); err != nil {
+		return err
+	}
+
 	conn.closed = true
 	return nil
+}
+
+func (conn *connect) UpdateTimeouts(config *ConnConfig) {
+	if config == nil {
+		return
+	}
+	conn.sendTimeout = time.Duration(config.sendTimeoutSeconds) * time.Second
+	conn.receiveTimeout = time.Duration(config.receiveTimeoutSeconds) * time.Second
 }

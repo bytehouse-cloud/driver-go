@@ -12,9 +12,10 @@ import (
 const unknownInt8Value = "unknown int8 value: %v, expects one of key in map: %v"
 
 type Enum8ColumnData struct {
-	raw  []byte
-	itoa map[int8]string
-	atoi map[string]int8
+	raw      []byte
+	itoa     map[int8]string
+	atoi     map[string]int8
+	isClosed bool
 }
 
 func (e *Enum8ColumnData) ReadFromDecoder(decoder *ch_encoding.Decoder) error {
@@ -90,6 +91,10 @@ func (e *Enum8ColumnData) Len() int {
 }
 
 func (e *Enum8ColumnData) Close() error {
+	if e.isClosed {
+		return nil
+	}
+	e.isClosed = true
 	bytepool.PutBytes(e.raw)
 	return nil
 }
@@ -100,7 +105,7 @@ func (e *Enum8ColumnData) Close() error {
 func (e *Enum8ColumnData) getInt8FromText(s string) (int8, error) {
 	s = processString(s)
 	v, ok := e.atoi[s]
-	if !ok { //possible to be Int8 string
+	if !ok { // possible to be Int8 string
 		i, err := strconv.ParseInt(s, 10, 8)
 		if err != nil {
 			return 0, errors.ErrorfWithCaller(unknownStringValue, s, e.atoi)

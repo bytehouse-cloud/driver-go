@@ -2,6 +2,8 @@ package sdk
 
 import (
 	"io"
+	"log"
+	"runtime/debug"
 
 	"github.com/bytehouse-cloud/driver-go/driver/lib/bytepool"
 	"github.com/bytehouse-cloud/driver-go/driver/lib/data"
@@ -25,6 +27,13 @@ func newResultFmtReader(fmtType string, blockStream <-chan *data.Block) *resultF
 	fmtReader.reader = zBuf
 
 	go func() {
+		defer func() {
+			if r := recover(); r != nil {
+				log.Printf("A runtime panic has occurred with err = [%s],  stacktrace = [%s]\n",
+					r,
+					string(debug.Stack()))
+			}
+		}()
 		defer func() {
 			if err := zBuf.Close(); err != nil {
 				if fmtReader.err != nil {

@@ -2,7 +2,8 @@ package conn
 
 import (
 	"crypto/tls"
-	"time"
+
+	"github.com/bytehouse-cloud/driver-go/driver/lib/settings"
 )
 
 type logf func(string, ...interface{})
@@ -14,12 +15,12 @@ var (
 
 func NewConnConfig(opts ...OptionConfig) (*ConnConfig, error) {
 	newConnConfigs := &ConnConfig{
-		logf:         noLog,
-		tlsConfig:    tlsConfDefault,
-		connTimeout:  time.Second,
-		dialStrategy: DialRandom,
-		readTimeout:  time.Minute,
-		writeTimeout: time.Minute,
+		logf:                  noLog,
+		tlsConfig:             tlsConfDefault,
+		connTimeoutSeconds:    settings.DBMS_DEFAULT_CONNECT_TIMEOUT_SEC,
+		dialStrategy:          DialRandom,
+		receiveTimeoutSeconds: settings.DBMS_DEFAULT_RECEIVE_TIMEOUT_SEC,
+		sendTimeoutSeconds:    settings.DBMS_DEFAULT_SEND_TIMEOUT_SEC,
 	}
 
 	for _, opt := range opts {
@@ -32,10 +33,10 @@ func NewConnConfig(opts ...OptionConfig) (*ConnConfig, error) {
 }
 
 type ConnConfig struct {
-	secure, skipVerify, noDelay            bool
-	tlsConfig                              *tls.Config
-	hosts                                  []string
-	connTimeout, readTimeout, writeTimeout time.Duration
-	dialStrategy                           DialStrategy
-	logf                                   func(string, ...interface{})
+	secure, skipVerify, noDelay                                   bool
+	tlsConfig                                                     *tls.Config
+	hosts                                                         []string
+	connTimeoutSeconds, receiveTimeoutSeconds, sendTimeoutSeconds uint64 //in seconds
+	dialStrategy                                                  DialStrategy
+	logf                                                          func(string, ...interface{})
 }

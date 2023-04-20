@@ -4,10 +4,11 @@ import (
 	"crypto/tls"
 	"fmt"
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/bytehouse-cloud/driver-go/driver/lib/settings"
 )
 
 func TestNewConnConfig(t *testing.T) {
@@ -20,12 +21,12 @@ func TestNewConnConfig(t *testing.T) {
 		{
 			name: "given no config then no error",
 			want: &ConnConfig{
-				tlsConfig:    tlsConfDefault,
-				connTimeout:  time.Second,
-				readTimeout:  time.Minute,
-				writeTimeout: time.Minute,
-				dialStrategy: DialRandom,
-				logf:         noLog,
+				tlsConfig:             tlsConfDefault,
+				connTimeoutSeconds:    settings.DBMS_DEFAULT_CONNECT_TIMEOUT_SEC,
+				receiveTimeoutSeconds: settings.DBMS_DEFAULT_RECEIVE_TIMEOUT_SEC,
+				sendTimeoutSeconds:    settings.DBMS_DEFAULT_SEND_TIMEOUT_SEC,
+				dialStrategy:          DialRandom,
+				logf:                  noLog,
 			},
 		},
 		{
@@ -47,9 +48,9 @@ func TestNewConnConfig(t *testing.T) {
 			name: "given full config then match same",
 			opts: []OptionConfig{
 				OptionRegion(RegionApSouthEast1),
-				OptionConnTimeout(time.Second),
-				OptionReadTimeout(time.Second),
-				OptionWriteTimeout(time.Second),
+				OptionConnTimeout(1),
+				OptionReceiveTimeout(1),
+				OptionSendTimeout(1),
 				OptionDialStrategy(DialRandom),
 				OptionHostName("some_host"),
 				OptionSecure(true),
@@ -58,16 +59,16 @@ func TestNewConnConfig(t *testing.T) {
 				OptionTlsConfig(tlsConfDefault),
 			},
 			want: &ConnConfig{
-				secure:       true,
-				skipVerify:   true,
-				noDelay:      true,
-				tlsConfig:    tlsConfDefault,
-				hosts:        []string{"gateway.aws-ap-southeast-1.bytehouse.cloud:19000", "some_host"},
-				connTimeout:  time.Second,
-				readTimeout:  time.Second,
-				writeTimeout: time.Second,
-				dialStrategy: DialRandom,
-				logf:         noLog,
+				secure:                true,
+				skipVerify:            true,
+				noDelay:               true,
+				tlsConfig:             tlsConfDefault,
+				hosts:                 []string{"gateway.aws-ap-southeast-1.bytehouse.cloud:19000", "some_host"},
+				connTimeoutSeconds:    1,
+				receiveTimeoutSeconds: 1,
+				sendTimeoutSeconds:    1,
+				dialStrategy:          DialRandom,
+				logf:                  noLog,
 			},
 		},
 	}

@@ -3,6 +3,8 @@ package values
 import (
 	"context"
 	"fmt"
+	"log"
+	"runtime/debug"
 
 	"golang.org/x/sync/errgroup"
 
@@ -41,6 +43,13 @@ func (a *ColumnValuesToBlock) Start(ctx context.Context) <-chan *data.Block {
 	a.done = make(chan struct{})
 
 	go func() {
+		defer func() {
+			if r := recover(); r != nil {
+				log.Printf("A runtime panic has occurred with err = [%s],  stacktrace = [%s]\n",
+					r,
+					string(debug.Stack()))
+			}
+		}()
 		defer close(outputStream)
 		defer close(a.done)
 

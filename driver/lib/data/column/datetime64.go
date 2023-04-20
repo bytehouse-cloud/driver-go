@@ -3,6 +3,7 @@ package column
 import (
 	"encoding/binary"
 	"math"
+	"strings"
 	"time"
 
 	"github.com/bytehouse-cloud/driver-go/driver/lib/bytepool"
@@ -10,14 +11,15 @@ import (
 )
 
 const (
-	dateTime64Len    = 8
-	dateTime64Format = "2006-01-02 15:04:05.999"
+	dateTime64Len          = 8
+	dateTime64FormatPrefix = "2006-01-02 15:04:05."
 )
 
 type DateTime64ColumnData struct {
 	precision int
 	timeZone  *time.Location
 	raw       []byte
+	isClosed  bool
 }
 
 func (d *DateTime64ColumnData) ReadFromDecoder(decoder *ch_encoding.Decoder) error {
@@ -54,15 +56,13 @@ func (d *DateTime64ColumnData) ReadFromTexts(texts []string) (int, error) {
 		err error
 	)
 
-	parseTime := interpretTimeFormat([]string{dateFormat, dateTimeFormat, dateTime64Format}, texts, d.timeZone)
-
 	for i, text := range texts {
 		if text == "" {
 			binary.LittleEndian.PutUint64(d.raw[i*dateTime64Len:], 0)
 			continue
 		}
 
-		t, err = parseTime(text)
+		t, err = parseDateTime64Format(supportedDateTimeFormats, text, d.precision, d.timeZone)
 		if err != nil {
 			return i, err
 		}
@@ -86,7 +86,7 @@ func (d *DateTime64ColumnData) GetValue(row int) interface{} {
 }
 
 func (d *DateTime64ColumnData) GetString(row int) string {
-	return d.get(row).Format(dateTime64Format)
+	return d.get(row).Format(d.getDateTime64Format())
 }
 
 func (d *DateTime64ColumnData) Zero() interface{} {
@@ -94,7 +94,7 @@ func (d *DateTime64ColumnData) Zero() interface{} {
 }
 
 func (d *DateTime64ColumnData) ZeroString() string {
-	return zeroTime.Format(dateTime64Format)
+	return zeroTime.Format(d.getDateTime64Format())
 }
 
 func (d *DateTime64ColumnData) Len() int {
@@ -102,6 +102,19 @@ func (d *DateTime64ColumnData) Len() int {
 }
 
 func (d *DateTime64ColumnData) Close() error {
+	if d.isClosed {
+		return nil
+	}
+	d.isClosed = true
 	bytepool.PutBytes(d.raw)
 	return nil
+}
+
+func (d *DateTime64ColumnData) getDateTime64Format() string {
+	var sb strings.Builder
+	sb.WriteString(dateTime64FormatPrefix)
+	for i := 0; i < d.precision; i++ {
+		sb.WriteString("0")
+	}
+	return sb.String()
 }
