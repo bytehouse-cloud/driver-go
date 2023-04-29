@@ -5,6 +5,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/bytehouse-cloud/driver-go/driver/lib/ch_encoding"
@@ -359,4 +360,86 @@ func TestBlockEncoderDecoder(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, tt.test)
 	}
+}
+
+func TestReadFromColumnValues_MoreColumnsThanRows_Success(t *testing.T) {
+	numRows := 1
+	colNames := []string{"a1", "a2", "a3", "a4", "a5", "a6"}
+	colTypes := []column.CHColumnType{"Int64", "Int64", "Int64", "Int64", "Int64", "Int64"}
+	block, err := NewBlock(colNames, colTypes, numRows)
+	if err != nil {
+		panic(err)
+	}
+	rowsRead, colsRead, err := block.ReadFromColumnValues([][]interface{}{
+		{1},
+		{2},
+		{3},
+		{4},
+		{5},
+		{6},
+	})
+
+	assert.NoError(t, err)
+	assert.Equal(t, rowsRead, 1)
+	assert.Equal(t, colsRead, 6)
+}
+
+func TestReadFromColumnValues_MoreColumnsThanRows_FifthColGotError(t *testing.T) {
+	numRows := 1
+	colNames := []string{"a1", "a2", "a3", "a4", "a5", "a6"}
+	colTypes := []column.CHColumnType{"Int64", "Int64", "Int64", "Int64", "Int64", "Int64"}
+	block, err := NewBlock(colNames, colTypes, numRows)
+	if err != nil {
+		panic(err)
+	}
+	rowsRead, colsRead, err := block.ReadFromColumnValues([][]interface{}{
+		{1},
+		{2},
+		{3},
+		{4},
+		{"abc"},
+		{6},
+	})
+
+	assert.Error(t, err)
+	assert.Equal(t, rowsRead, 0)
+	assert.Equal(t, colsRead, 4)
+}
+
+func TestReadFromColumnValues_MoreRowsThanColumns_Success(t *testing.T) {
+	numRows := 10
+	colNames := []string{"a1", "a2", "a3"}
+	colTypes := []column.CHColumnType{"Int64", "Int64", "Int64"}
+	block, err := NewBlock(colNames, colTypes, numRows)
+	if err != nil {
+		panic(err)
+	}
+	rowsRead, colsRead, err := block.ReadFromColumnValues([][]interface{}{
+		{1, 1, 1, 1, 1, 1, 1, 1, 1, 1},
+		{1, 1, 1, 1, 1, 1, 1, 1, 1, 1},
+		{1, 1, 1, 1, 1, 1, 1, 1, 1, 1},
+	})
+
+	assert.NoError(t, err)
+	assert.Equal(t, rowsRead, 10)
+	assert.Equal(t, colsRead, 3)
+}
+
+func TestReadFromColumnValues_MoreRowsThanColumns_SecondColGotError(t *testing.T) {
+	numRows := 10
+	colNames := []string{"a1", "a2", "a3"}
+	colTypes := []column.CHColumnType{"Int64", "Int64", "Int64"}
+	block, err := NewBlock(colNames, colTypes, numRows)
+	if err != nil {
+		panic(err)
+	}
+	rowsRead, colsRead, err := block.ReadFromColumnValues([][]interface{}{
+		{1, 1, 1, 1, 1, 1, 1, 1, 1, 1},
+		{1, 1, 1, "abc", 1, 1, 1, 1, 1, 1},
+		{1, 1, 1, 1, 1, 1, 1, 1, 1, 1},
+	})
+
+	assert.Error(t, err)
+	assert.Equal(t, rowsRead, 3)
+	assert.Equal(t, colsRead, 1)
 }

@@ -149,14 +149,13 @@ func (b *Block) ReadFromColumnTexts(columnTexts [][]string) (rowsRead, columnsRe
 		return 0, 0, errors.ErrorfWithCaller("incorrect number of column, given: %v, expected: %v", len(columnTexts), b.NumColumns)
 	}
 
-	var col []string
-	for rowsRead, col = range columnTexts {
-		if columnsRead, err = b.Columns[rowsRead].Data.ReadFromTexts(col); err != nil {
-			return columnsRead, rowsRead, err
+	for colIdx, colText := range columnTexts {
+		if rowsRead, err = b.Columns[colIdx].Data.ReadFromTexts(colText); err != nil {
+			return rowsRead, colIdx, err
 		}
 	}
 
-	return columnsRead, len(columnTexts), nil
+	return rowsRead, len(columnTexts), nil
 }
 
 func (b *Block) ReadFromColumnValues(colValues [][]interface{}) (rowsRead, columnsRead int, err error) {
@@ -167,14 +166,13 @@ func (b *Block) ReadFromColumnValues(colValues [][]interface{}) (rowsRead, colum
 		return 0, 0, errors.ErrorfWithCaller("incorrect number of column, given: %v, expected: %v", len(colValues), b.NumColumns)
 	}
 
-	var col []interface{}
-	for rowsRead, col = range colValues {
-		if columnsRead, err = b.Columns[rowsRead].Data.ReadFromValues(col); err != nil {
-			return columnsRead, rowsRead, err
+	for colIdx, colVal := range colValues {
+		if rowsRead, err = b.Columns[colIdx].Data.ReadFromValues(colVal); err != nil {
+			return rowsRead, colIdx, err
 		}
 	}
 
-	return columnsRead, len(colValues), nil
+	return rowsRead, len(colValues), nil
 }
 
 func (b *Block) Close() error {
