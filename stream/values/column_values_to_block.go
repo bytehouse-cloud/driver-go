@@ -55,6 +55,13 @@ func (a *ColumnValuesToBlock) Start(ctx context.Context) <-chan *data.Block {
 
 		for i := 0; i < a.parallelism; i++ {
 			a.errGroup.Go(func() error {
+				defer func() {
+					if r := recover(); r != nil {
+						log.Printf("A runtime panic has occurred with err = [%s],  stacktrace = [%s]\n",
+							r,
+							string(debug.Stack()))
+					}
+				}()
 				for {
 					select {
 					case <-ctx.Done():
@@ -72,7 +79,7 @@ func (a *ColumnValuesToBlock) Start(ctx context.Context) <-chan *data.Block {
 						if err != nil {
 							return fmt.Errorf(
 								"reading into block error. row_idx: %v, col_idx: %v, name: %v, type: %v, given: %v, err: %s",
-								rowsRead, colsRead, newBlock.Columns[colsRead].Name, newBlock.Columns[colsRead].Type, columns[rowsRead][colsRead], err,
+								rowsRead, colsRead, newBlock.Columns[colsRead].Name, newBlock.Columns[colsRead].Type, columns[colsRead][rowsRead], err,
 							)
 						}
 						a.recycle(columns)
