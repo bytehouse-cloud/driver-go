@@ -27,14 +27,80 @@ func Test_parseInsertQuery(t *testing.T) {
 			},
 		},
 		{
+			name: "Should parse insert Query",
+			args: args{
+				query: "INSERT INTO demo_db_one.sample_table (col1, col2) Values (4294967295,'RED BLUE YELLOW')",
+			},
+			want: &InsertQuery{
+				DataFmt: "VALUES",
+				Query:   "INSERT INTO demo_db_one.sample_table (col1, col2) VALUES",
+				Values:  "(4294967295,'RED BLUE YELLOW')",
+			},
+		},
+		{
+			name: "Should parse insert Query",
+			args: args{
+				query: "INSERT INTO demo_db_one.sample_table(col1, col2) Values (4294967295,'RED BLUE YELLOW')",
+			},
+			want: &InsertQuery{
+				DataFmt: "VALUES",
+				Query:   "INSERT INTO demo_db_one.sample_table(col1, col2) VALUES",
+				Values:  "(4294967295,'RED BLUE YELLOW')",
+			},
+		},
+		{
+			name: "Should parse insert Query",
+			args: args{
+				query: "INSERT INTO `demo_db_one`.`sample_table(name)`(col1, col2) Values (4294967295,'RED BLUE YELLOW')",
+			},
+			want: &InsertQuery{
+				DataFmt: "VALUES",
+				Query:   "INSERT INTO `demo_db_one`.`sample_table(name)`(col1, col2) VALUES",
+				Values:  "(4294967295,'RED BLUE YELLOW')",
+			},
+		},
+		{
+			name: "Should parse insert Query",
+			args: args{
+				query: "INSERT INTO `demo_db _one`.`sample_ta(ble` (col1, col2) Values (4294967295,'RED BLUE YELLOW')",
+			},
+			want: &InsertQuery{
+				DataFmt: "VALUES",
+				Query:   "INSERT INTO `demo_db _one`.`sample_ta(ble` (col1, col2) VALUES",
+				Values:  "(4294967295,'RED BLUE YELLOW')",
+			},
+		},
+		{
+			name: "Should parse insert Query",
+			args: args{
+				query: "INSERT INTO demo_db_one.sample_table(col1, col2) Values (4294967295,'RED BLUE YELLOW')",
+			},
+			want: &InsertQuery{
+				DataFmt: "VALUES",
+				Query:   "INSERT INTO demo_db_one.sample_table(col1, col2) VALUES",
+				Values:  "(4294967295,'RED BLUE YELLOW')",
+			},
+		},
+		{
 			name: "Should parse insert Query json",
 			args: args{
-				query: "INSERT INTO demo_db_one.sample_table        json {}",
+				query: "INSERT INTO demo_db_one.sample_table FORMAT JSON INFILE 'read.json'",
 			},
 			want: &InsertQuery{
 				DataFmt: "JSON",
-				Query:   "INSERT INTO demo_db_one.sample_table JSON",
-				Values:  "{}",
+				Query:   "INSERT INTO demo_db_one.sample_table FORMAT JSON",
+				Values:  "INFILE 'read.json'",
+			},
+		},
+		{
+			name: "Should parse insert Query json",
+			args: args{
+				query: "INSERT INTO demo_db_one.sample_table (col1, col2, col3) FORMAT JSON INFILE 'read.json'",
+			},
+			want: &InsertQuery{
+				DataFmt: "JSON",
+				Query:   "INSERT INTO demo_db_one.sample_table (col1, col2, col3) FORMAT JSON",
+				Values:  "INFILE 'read.json'",
 			},
 		},
 		{
@@ -56,6 +122,50 @@ func Test_parseInsertQuery(t *testing.T) {
 			want: &InsertQuery{
 				DataFmt: "CSV",
 				Query:   "insert into `table_read` FORMAT CSV",
+				Values:  "INFILE 'read.csv'",
+			},
+		},
+		{
+			name: "Should parse insert Query csv when table name contains the word csv",
+			args: args{
+				query: "insert into `db1`.`csvtest3` FORMAT CSV INFILE 'read.csv'",
+			},
+			want: &InsertQuery{
+				DataFmt: "CSV",
+				Query:   "insert into `db1`.`csvtest3` FORMAT CSV",
+				Values:  "INFILE 'read.csv'",
+			},
+		},
+		{
+			name: "Should parse insert Query csv when table name contains the word csv",
+			args: args{
+				query: "insert into `db1`.`csvtest3` (col1, col2, col3)  FORMAT CSV INFILE 'read.csv'",
+			},
+			want: &InsertQuery{
+				DataFmt: "CSV",
+				Query:   "insert into `db1`.`csvtest3` (col1, col2, col3) FORMAT CSV",
+				Values:  "INFILE 'read.csv'",
+			},
+		},
+		{
+			name: "Should parse insert Query csv when table name contains the word csv",
+			args: args{
+				query: "insert into `csv` FORMAT CSV INFILE 'read.csv'",
+			},
+			want: &InsertQuery{
+				DataFmt: "CSV",
+				Query:   "insert into `csv` FORMAT CSV",
+				Values:  "INFILE 'read.csv'",
+			},
+		},
+		{
+			name: "Should parse insert Query csv when table name contains the word csv",
+			args: args{
+				query: "insert into csv FORMAT CSV INFILE 'read.csv'",
+			},
+			want: &InsertQuery{
+				DataFmt: "CSV",
+				Query:   "insert into csv FORMAT CSV",
 				Values:  "INFILE 'read.csv'",
 			},
 		},
