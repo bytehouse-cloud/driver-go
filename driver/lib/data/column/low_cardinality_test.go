@@ -290,16 +290,16 @@ func TestLowCardinalityColumnData_ReadFromValues(t *testing.T) {
 			wantErr:         true,
 		},
 		{
-			name:       "Should throw error if nil",
+			name:       "If nil, Return zero value of data type",
 			columnType: "LowCardinality(Date)",
 			args: args{
 				values: []interface{}{
 					nil,
 				},
 			},
-			wantDataWritten: []string{},
-			wantRowsRead:    0,
-			wantErr:         true,
+			wantDataWritten: []string{"1970-01-01"},
+			wantRowsRead:    1,
+			wantErr:         false,
 		},
 		// Disable tests for wrapped complex types since not supported
 		// See https://clickhouse.tech/docs/en/sql-reference/data-types/lowcardinality/ for supported types

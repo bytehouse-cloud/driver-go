@@ -83,31 +83,48 @@ func TestUUIDColumnData_ReadFromValues(t *testing.T) {
 	type args struct {
 		values []interface{}
 	}
+	uuid1 := uuid.New()
+	uuid2 := uuid.New()
+
 	tests := []struct {
-		name    string
-		args    args
-		want    int
-		wantErr bool
+		name            string
+		args            args
+		want            int
+		wantErr         bool
+		wantDataWritten []interface{}
 	}{
+		{
+			name: "Should return the zero uuids if value is nil",
+			args: args{
+				values: []interface{}{
+					nil, uuid1,
+				},
+			},
+			want:            2,
+			wantErr:         false,
+			wantDataWritten: []interface{}{zeroUUID, uuid1},
+		},
 		{
 			name: "Should return the same uuids",
 			args: args{
 				values: []interface{}{
-					uuid.New(), uuid.New(),
+					uuid1, uuid2,
 				},
 			},
-			want:    2,
-			wantErr: false,
+			want:            2,
+			wantErr:         false,
+			wantDataWritten: []interface{}{uuid1, uuid2},
 		},
 		{
 			name: "Should throw error if one of the values is not uuid",
 			args: args{
 				values: []interface{}{
-					uuid.New(), 123,
+					uuid1, 123,
 				},
 			},
-			want:    1,
-			wantErr: true,
+			want:            1,
+			wantErr:         true,
+			wantDataWritten: []interface{}{uuid1},
 		},
 	}
 	for _, tt := range tests {
@@ -120,6 +137,10 @@ func TestUUIDColumnData_ReadFromValues(t *testing.T) {
 			}
 			if got != tt.want {
 				t.Errorf("ReadFromValues() got = %v, want %v", got, tt.want)
+			} else {
+				for i := 0; i < got; i++ {
+					assert.Equal(t, d.GetValue(i), tt.wantDataWritten[i])
+				}
 			}
 		})
 	}
@@ -149,6 +170,15 @@ func TestUUIDColumnData_EncoderDecoder(t *testing.T) {
 			name: "Should write data and return number of rows read with no error if empty string, 2 rows",
 			args: args{
 				texts: []string{"", "123e4567-e89b-12d3-a456-426614174000"},
+			},
+			wantDataWritten: []uuid.UUID{zeroUUID, uuid.MustParse("123e4567-e89b-12d3-a456-426614174000")},
+			wantRowsRead:    2,
+			wantErr:         false,
+		},
+		{
+			name: "Should write data and return number of rows read with no error if empty string, 2 rows",
+			args: args{
+				texts: []string{"null", "123e4567-e89b-12d3-a456-426614174000"},
 			},
 			wantDataWritten: []uuid.UUID{zeroUUID, uuid.MustParse("123e4567-e89b-12d3-a456-426614174000")},
 			wantRowsRead:    2,

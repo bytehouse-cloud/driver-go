@@ -5,6 +5,7 @@ import (
 	"io"
 	"testing"
 
+	"github.com/bytehouse-cloud/driver-go/utils/pointer"
 	"github.com/stretchr/testify/require"
 
 	"github.com/bytehouse-cloud/driver-go/driver/lib/bytepool"
@@ -55,7 +56,7 @@ func TestConn(t *testing.T) {
 					Conn:           fConn,
 					logf:           func(s string, i ...interface{}) {},
 					ident:          1,
-					zReader:        bytepool.NewZReader(fConn, 1024*4, 8),
+					zReader:        bytepool.NewZReader(pointer.IoReader(fConn), 1024*4, 8),
 					receiveTimeout: 1000,
 					sendTimeout:    1000,
 				}
@@ -72,7 +73,7 @@ func TestConn(t *testing.T) {
 					Conn:           fConn,
 					logf:           func(s string, i ...interface{}) {},
 					ident:          1,
-					zReader:        bytepool.NewZReader(fConn, 1024*4, 8),
+					zReader:        bytepool.NewZReader(pointer.IoReader(fConn), 1024*4, 8),
 					receiveTimeout: 1000,
 					sendTimeout:    1000,
 				}
@@ -88,7 +89,7 @@ func TestConn(t *testing.T) {
 					Conn:           fConn,
 					logf:           func(s string, i ...interface{}) {},
 					ident:          1,
-					zReader:        bytepool.NewZReader(fConn, 1024*4, 8),
+					zReader:        bytepool.NewZReader(pointer.IoReader(fConn), 1024*4, 8),
 					bWriter:        bufio.NewWriter(fConn),
 					receiveTimeout: 1000,
 					sendTimeout:    1000,
@@ -107,7 +108,7 @@ func TestConn(t *testing.T) {
 					Conn:           fConn,
 					logf:           func(s string, i ...interface{}) {},
 					ident:          1,
-					zReader:        bytepool.NewZReader(fConn, 1024*4, 8),
+					zReader:        bytepool.NewZReader(pointer.IoReader(fConn), 1024*4, 8),
 					bWriter:        bufio.NewWriter(fConn),
 					receiveTimeout: 1000,
 					sendTimeout:    1000,

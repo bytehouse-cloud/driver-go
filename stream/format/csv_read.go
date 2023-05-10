@@ -23,14 +23,16 @@ type CSVBlockStreamFmtReader struct {
 	withNames bool
 }
 
-func NewCSVBlockStreamFmtReader(input io.Reader, withNames bool, settings map[string]interface{}) (*CSVBlockStreamFmtReader, error) {
+func NewCSVBlockStreamFmtReader(
+	input io.Reader, withNames bool, settings map[string]interface{},
+) (*CSVBlockStreamFmtReader, error) {
 	delim, err := resolveCSVDelim(settings)
 	if err != nil {
 		return nil, err
 	}
 
 	return &CSVBlockStreamFmtReader{
-		zReader:   bytepool.NewZReaderDefault(input),
+		zReader:   bytepool.NewZReaderDefault(&input),
 		delimiter: delim,
 		withNames: withNames,
 	}, nil
@@ -56,11 +58,15 @@ func (c *CSVBlockStreamFmtReader) ReadRowCont(fb *bytepool.FrameBuffer, cols []*
 	return helper.ReadRow(fb, cols, c)
 }
 
-func (c *CSVBlockStreamFmtReader) ReadFirstColumnTexts(fb *bytepool.FrameBuffer, numRows int, cols []*column.CHColumn) (int, error) {
+func (c *CSVBlockStreamFmtReader) ReadFirstColumnTexts(
+	fb *bytepool.FrameBuffer, numRows int, cols []*column.CHColumn,
+) (int, error) {
 	return helper.ReadFirstColumnTexts(fb, numRows, cols, c)
 }
 
-func (c *CSVBlockStreamFmtReader) ReadColumnTextsCont(fb *bytepool.FrameBuffer, numRows int, cols []*column.CHColumn) (int, error) {
+func (c *CSVBlockStreamFmtReader) ReadColumnTextsCont(
+	fb *bytepool.FrameBuffer, numRows int, cols []*column.CHColumn,
+) (int, error) {
 	return helper.ReadColumnTextsCont(fb, numRows, cols, c)
 }
 
@@ -70,20 +76,25 @@ func (c *CSVBlockStreamFmtReader) ReadElem(fb *bytepool.FrameBuffer, cols []*col
 			return err
 		}
 	}
-
+	isSingleCol := len(cols) == 1
 	isLast := (len(cols) - 1) == idx
-	return c.readElem(fb, cols[idx], isLast)
+	return c.readElem(fb, cols[idx], isLast, isSingleCol)
 }
 
-func (c *CSVBlockStreamFmtReader) readElem(fb *bytepool.FrameBuffer, col *column.CHColumn, last bool) error {
+func (c *CSVBlockStreamFmtReader) readElem(
+	fb *bytepool.FrameBuffer, col *column.CHColumn, last bool, singleCol bool,
+) error {
 	var (
 		b   byte
 		err error
 	)
 
-	if last {
+	if !singleCol && last {
 		b, err = helper.ReadNextNonSpaceExceptNewLineByte(c.zReader)
 		if err != nil {
+			if err == io.EOF {
+				return nil
+			}
 			return err
 		}
 	} else {
@@ -159,7 +170,9 @@ func (c *CSVBlockStreamFmtReader) readStringQuotedCheck(fb *bytepool.FrameBuffer
 
 // readStringQuoteIndexed assumes that current buffer from zReader contain the quote at i index,
 // and i is not the last index of current buf
-func (c *CSVBlockStreamFmtReader) readStringQuoteIndexed(fb *bytepool.FrameBuffer, buf []byte, i int, quote byte) error {
+func (c *CSVBlockStreamFmtReader) readStringQuoteIndexed(
+	fb *bytepool.FrameBuffer, buf []byte, i int, quote byte,
+) error {
 	if buf[i+1] == quote { // current quote at index i is escaped
 		fb.Write(buf[:i+1]) // append everything until including quote
 		c.zReader.UnreadCurrentBuffer(len(buf) - i - 2)
@@ -172,7 +185,9 @@ func (c *CSVBlockStreamFmtReader) readStringQuoteIndexed(fb *bytepool.FrameBuffe
 }
 
 // readElemWithoutQuote read from buf until Delimiter or newline is reached
-func (c *CSVBlockStreamFmtReader) readElemWithoutQuote(fb *bytepool.FrameBuffer, col *column.CHColumn, last bool) (err error) {
+func (c *CSVBlockStreamFmtReader) readElemWithoutQuote(
+	fb *bytepool.FrameBuffer, col *column.CHColumn, last bool,
+) (err error) {
 	if last {
 		return c.readLastElemWithoutQuote(fb)
 	}
@@ -184,7 +199,7 @@ func (c *CSVBlockStreamFmtReader) readLastElemWithoutQuote(fb *bytepool.FrameBuf
 	_, err := helper.ReadStringUntilByte(fb, c.zReader, '\n')
 	switch err {
 	case nil:
-		c.zReader.UnreadCurrentBuffer(1)
+		//c.zReader.UnreadCurrentBuffer(1)
 		return nil
 	case io.EOF:
 		return nil
@@ -246,7 +261,7 @@ func getEscapedDelimiter(b []byte) (byte, error) {
 		return 0, errors.ErrorfWithCaller("delimiter should only be 1 byte, got %s", b)
 	}
 
-	//The following escape sequences have a corresponding special value: \b, \f, \r, \n, \t, \0, \a, \v
+	// The following escape sequences have a corresponding special value: \b, \f, \r, \n, \t, \0, \a, \v
 	switch b[1] {
 	case 'a':
 		return '\a', nil

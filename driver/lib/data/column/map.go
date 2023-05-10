@@ -169,7 +169,7 @@ func (m *MapColumnData) ReadFromTexts(texts []string) (int, error) {
 	)
 
 	for i, text = range texts {
-		if text == "" {
+		if isEmptyOrNull(text) {
 			binary.LittleEndian.PutUint64(m.offsetsRaw[i*uint64ByteSize:], uint64(len(keyTexts)))
 			continue
 		}

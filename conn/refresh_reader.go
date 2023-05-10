@@ -14,21 +14,28 @@ type SetReadDeadlineReader interface {
 
 // RefreshReader is a Reader that extends the read deadline
 // by a fixed duration each time a read operation was carried out.
-type RefreshReader struct {
-	closed bool
-	lock   sync.Mutex
-	signal chan struct{}
-	reader SetReadDeadlineReader
+type RefreshReader struct { // static timeout at creation
+	closed          bool
+	lock            sync.Mutex
+	signal          chan struct{}
+	refreshInterval time.Duration
+	reader          SetReadDeadlineReader
 }
 
-func NewRefreshReader(r SetReadDeadlineReader, reset time.Duration) *RefreshReader {
+func NewRefreshReader(r SetReadDeadlineReader, refreshInterval time.Duration) *RefreshReader {
 	newRefreshReader := &RefreshReader{
-		signal: make(chan struct{}, 1),
-		reader: r,
+		signal:          make(chan struct{}, 1),
+		reader:          r,
+		refreshInterval: refreshInterval,
 	}
 
-	go newRefreshReader.asyncRefreshTimeout(reset)
+	go newRefreshReader.asyncRefreshTimeout()
 	return newRefreshReader
+}
+
+func (r *RefreshReader) ForceSetReadTimeout(refreshInterval time.Duration) {
+	r.refreshInterval = refreshInterval
+	r.reader.SetReadDeadline(time.Now().Add(r.refreshInterval))
 }
 
 func (r *RefreshReader) Read(p []byte) (int, error) {
@@ -46,7 +53,6 @@ func (r *RefreshReader) refresh(err error) {
 		r.Close()
 		return
 	}
-
 	if r.isClose() { // ignore if the refreshReader is closed alr;
 		return
 	}
@@ -60,12 +66,11 @@ func (r *RefreshReader) refresh(err error) {
 	return
 }
 
-func (r *RefreshReader) asyncRefreshTimeout(reset time.Duration) {
-	// minimun refresh rate
-	interval := reset / 2
-
+func (r *RefreshReader) asyncRefreshTimeout() {
+	// minimum refresh rate
 	for {
-		r.reader.SetReadDeadline(time.Now().Add(reset))
+		interval := r.refreshInterval / 2
+		r.reader.SetReadDeadline(time.Now().Add(r.refreshInterval))
 		time.Sleep(interval)
 		<-r.signal
 		if r.isClose() {

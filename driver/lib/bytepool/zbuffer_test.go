@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/bytehouse-cloud/driver-go/utils/pointer"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -128,7 +129,7 @@ func TestZBuffer_ZWriter(t *testing.T) {
 
 func TestZBuffer_ZReader(t *testing.T) {
 	zbuf := NewZBuffer(4, 2)
-	zReader := NewZReader(zbuf, 3, 2)
+	zReader := NewZReader(pointer.IoReader(zbuf), 3, 2)
 	go func() {
 		zbuf.Write([]byte("1234567890"))
 		zbuf.Flush()

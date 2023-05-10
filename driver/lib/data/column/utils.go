@@ -285,6 +285,9 @@ func getDateTime64Param(t CHColumnType) (int, *time.Location, error) {
 	if err != nil {
 		return 0, nil, err
 	}
+	if tzString == "" {
+		return precision, nil, nil
+	}
 
 	if tzString == localtime {
 		tzString = local
@@ -294,6 +297,19 @@ func getDateTime64Param(t CHColumnType) (int, *time.Location, error) {
 		return 0, nil, err
 	}
 	return precision, tz, nil
+}
+
+func getTimeParam(t CHColumnType) (int, error) {
+
+	scaleString := string(t[5 : len(t)-1]) //Time(3)
+	if len(scaleString) == 0 {
+		return 0, nil
+	}
+	scale, err := strconv.ParseInt(scaleString, 10, 64)
+	if err != nil {
+		return 0, err
+	}
+	return int(scale), nil
 }
 
 func getColumnValuesUsingOffset(start, end int, columnData CHColumnData) []interface{} {

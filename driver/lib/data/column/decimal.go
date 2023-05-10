@@ -2,14 +2,13 @@ package column
 
 import (
 	"encoding/binary"
-	"fmt"
-	"math"
 	"math/big"
 	"strconv"
 
 	"github.com/bytehouse-cloud/driver-go/driver/lib/bytepool"
 	"github.com/bytehouse-cloud/driver-go/driver/lib/ch_encoding"
 	"github.com/bytehouse-cloud/driver-go/errors"
+	"github.com/shopspring/decimal"
 )
 
 const (
@@ -17,18 +16,21 @@ const (
 	precisionNotSupportedErr = "precision of %v not supported"
 	unreachableExecutionErr  = "unreachable execution path"
 	unsupportedPrecisionErr  = "unsupported decimal precision: %v"
+	valueOverFlowsErr        = "decimal value overflow because exceed precision=%v"
 )
 
 const (
-	maxSupportedDecimalBytes     = 16
-	maxSupportedDecimalPrecision = 38
-	maxMantissaBit128Precision   = 120
+	maxSupportedDecimalBytes     = 32
+	maxSupportedDecimalPrecision = 76
+
+	maxBitLenDecimal128 = 127 // corresponding to largest Int128 with 38 digits
+	maxBitLenDecimal256 = 253 // corresponding to largest Int256 with 76 digits
 )
 
-var factors10 = []float64{
-	1e0, 1e1, 1e2, 1e3, 1e4, 1e5, 1e6, 1e7, 1e8, 1e9, 1e10,
-	1e11, 1e12, 1e13, 1e14, 1e15, 1e16, 1e17, 1e18, 1e19, 1e20,
-}
+var (
+	biggestInt128With38Digits, _ = new(big.Int).SetString("99999999999999999999999999999999999999", 10)
+	biggestInt256With76Digits, _ = new(big.Int).SetString("9999999999999999999999999999999999999999999999999999999999999999999999999999", 10)
+)
 
 // DecimalColumnData represents Decimal(P, S) in Clickhouse.
 // Decimals are fixed-point numbers that preserve precision for add, sub and mul operations.
@@ -36,12 +38,11 @@ var factors10 = []float64{
 // For division least significant digits are discarded (not rounded).
 // See https://clickhouse.tech/docs/en/sql-reference/data-types/decimal
 type DecimalColumnData struct {
-	precision   int // support up to 38 digits
-	scale       int // support up to 38 decimal values.
-	byteCount   int
-	raw         []byte
-	fmtTemplate string
-	isClosed    bool
+	precision int
+	scale     int
+	byteCount int
+	raw       []byte
+	isClosed  bool
 }
 
 func (d *DecimalColumnData) ReadFromDecoder(decoder *ch_encoding.Decoder) error {
@@ -74,6 +75,11 @@ func (d *DecimalColumnData) ReadFromValues(values []interface{}) (int, error) {
 	}
 
 	for i, value := range values {
+		if value == nil {
+			_ = d.putDecimalIntoBytes(i, 0.0)
+			continue
+		}
+
 		if err := d.putDecimalIntoBytes(i, value); err != nil {
 			return i, err
 		}
@@ -88,19 +94,19 @@ func (d *DecimalColumnData) ReadFromTexts(texts []string) (int, error) {
 	}
 
 	for i, text := range texts {
-		if text == "" {
+		if isEmptyOrNull(text) {
 			_ = d.putDecimalIntoBytes(i, 0.0)
 			continue
 		}
 
-		// Attempt parsing the float
+		// Attempt parsing to decimal
 		v, err := d.parseDecimal(text)
 		if err != nil {
 			return i, errors.ErrorfWithCaller(invalidDecimalStringErr, text)
 		}
 
 		// Put it into little-endian bytes
-		if err := d.putDecimalIntoBytes(i, v); err != nil {
+		if err = d.putDecimalIntoBytes(i, v); err != nil {
 			return i, err
 		}
 	}
@@ -111,11 +117,13 @@ func (d *DecimalColumnData) ReadFromTexts(texts []string) (int, error) {
 func (d *DecimalColumnData) GetValue(row int) interface{} {
 	switch d.byteCount {
 	case 4:
-		return d.decimal32ToFloat64(row)
+		return d.decimal32ToDecimal(row)
 	case 8:
-		return d.decimal64ToFloat64(row)
+		return d.decimal64ToDecimal(row)
 	case 16:
-		return d.decimal128ToBigFloat(row)
+		return d.decimal128ToDecimal(row)
+	case 32:
+		return d.decimal256ToDecimal(row)
 	default:
 		panic(unreachableExecutionErr)
 	}
@@ -124,14 +132,17 @@ func (d *DecimalColumnData) GetValue(row int) interface{} {
 func (d *DecimalColumnData) GetString(row int) string {
 	switch d.byteCount {
 	case 4:
-		v := d.decimal32ToFloat64(row)
-		return fmt.Sprintf(d.fmtTemplate, v)
+		v := d.decimal32ToDecimal(row)
+		return v.StringFixed(int32(d.scale))
 	case 8:
-		v := d.decimal64ToFloat64(row)
-		return fmt.Sprintf(d.fmtTemplate, v)
+		v := d.decimal64ToDecimal(row)
+		return v.StringFixed(int32(d.scale))
 	case 16:
-		v := d.decimal128ToBigFloat(row)
-		return v.Text('f', d.scale)
+		v := d.decimal128ToDecimal(row)
+		return v.StringFixed(int32(d.scale))
+	case 32:
+		v := d.decimal256ToDecimal(row)
+		return v.StringFixed(int32(d.scale))
 	default:
 		return "0.0"
 	}
@@ -158,97 +169,111 @@ func (d *DecimalColumnData) Close() error {
 	return nil
 }
 
-func (d *DecimalColumnData) decimal32ToFloat64(row int) float64 {
+func (d *DecimalColumnData) decimal32ToDecimal(row int) decimal.Decimal {
 	n := bufferRowToUint32(d.raw, row)
-	val := float64(n)
-	return val / factors10[d.scale]
+	/*
+		(1) For Decimal32, Clickhouse Server send us 4 bytes representing Int32 (what Server stores internally)
+		(2) int32 and uint32 have same bit-representation in memory so when we read UInt32,
+		we can use type conversion to get the original Int32 that Server sends.
+		Unsafe.Pointer is another way to convert one type to another type having similar memory layout
+	*/
+	return decimal.New(int64(int32(n)), int32(-d.scale))
 }
 
-func (d *DecimalColumnData) decimal64ToFloat64(row int) float64 {
+func (d *DecimalColumnData) decimal64ToDecimal(row int) decimal.Decimal {
+	/*
+		(1) For Decimal64, Clickhouse Server send us 8 bytes representing Int64 (what Server stores internally)
+		(2) int64 and uint64 have same bit-representation in memory so when we read UInt64,
+		we can use type conversion to get the original Int64 that Server sends.
+		Unsafe.Pointer is another way to convert one type to another type having similar memory layout
+	*/
 	n := bufferRowToUint64(d.raw, row)
-	val := float64(n)
-	return val / factors10[d.scale]
+	return decimal.New(int64(n), int32(-d.scale))
 }
 
-func (d *DecimalColumnData) decimal128ToBigFloat(row int) *big.Float {
-	// The bytes sent is a 16 bytes int128 in
-	// little big endian
+func (d *DecimalColumnData) decimal128ToDecimal(row int) decimal.Decimal {
+	// For Decimal128, Clickhouse Server send us 16 bytes representing Int128 (what Server stores internally)
 	bytes := d.raw[row*16 : (row+1)*16]
-
-	// Reverse to make it big endian, since big
-	// pkg uses big endian
-	for i, j := 0, len(bytes)-1; i < j; i, j = i+1, j-1 {
-		bytes[i], bytes[j] = bytes[j], bytes[i]
-	}
-
-	bi := big.NewInt(0).SetBytes(bytes)
-	bf := new(big.Float).SetInt(bi)
-
-	factor10 := big.NewFloat(math.Pow10(d.scale))
-	bf = bf.Quo(bf, factor10) // division by scale factor
-
-	return bf
+	bi := rawToBigInt(bytes, true)
+	return decimal.NewFromBigInt(bi, -int32(d.scale))
 }
 
-func (d *DecimalColumnData) parseDecimal(s string) (interface{}, error) {
-	switch d.byteCount {
-	case 16:
-		v, _, err := big.ParseFloat(s, 10, maxMantissaBit128Precision, big.ToNearestEven)
-		if err != nil {
-			return nil, err
-		}
-		return v, nil
-	default:
-		f64, err := strconv.ParseFloat(s, d.byteCount*8)
-		if err != nil {
-			return nil, err
-		}
-		return f64, nil
-	}
+func (d *DecimalColumnData) decimal256ToDecimal(row int) decimal.Decimal {
+	// For Decimal128, Clickhouse Server send us 16 bytes representing Int128 (what Server stores internally)
+	bytes := d.raw[row*32 : (row+1)*32]
+	bi := rawToBigInt(bytes, true)
+	return decimal.NewFromBigInt(bi, -int32(d.scale))
 }
 
-func (d *DecimalColumnData) putDecimalIntoBytes(i int, decimal interface{}) error {
+func (d *DecimalColumnData) parseDecimal(s string) (decimal.Decimal, error) {
+	v, err := decimal.NewFromString(s)
+	if err != nil {
+		return decimal.Decimal{}, err
+	}
+	return v, nil
+}
+
+func (d *DecimalColumnData) putDecimalIntoBytes(i int, val interface{}) error {
 	switch d.byteCount {
-	case 4:
-		v, err := d.getDecimalToFloat64(decimal)
+	case 4: // Decimal32
+		v, err := d.getValToDecimal(val)
+		if err != nil {
+			return err
+		}
+		part := v.Shift(int32(d.scale)).IntPart()
+
+		// Check for overflow, golang conversion always yields a valid value with no indication of overflow.
+		// inline overflow checking reference: https://groups.google.com/g/golang-nuts/c/kPr7wZTAQM4
+		a := int32(part)
+		if int64(a) != part {
+			return errors.ErrorfWithCaller(valueOverFlowsErr, d.precision)
+		}
+
+		binary.LittleEndian.PutUint32(d.raw[i*4:], uint32(part)) // serialize to bytes
+	case 8: // Decimal64
+		v, err := d.getValToDecimal(val)
 		if err != nil {
 			return err
 		}
 
-		x := uint32(v * factors10[d.scale])           // apply scale factor
-		binary.LittleEndian.PutUint32(d.raw[i*4:], x) // serialize to bytes
-
-	case 8:
-		v, err := d.getDecimalToFloat64(decimal)
+		// Check for overflow, golang conversion always yields a valid value with no indication of overflow.
+		bi := v.Shift(int32(d.scale)).BigInt()
+		if !bi.IsInt64() {
+			return errors.ErrorfWithCaller(valueOverFlowsErr, d.precision)
+		}
+		binary.LittleEndian.PutUint64(d.raw[i*8:], uint64(bi.Int64())) // serialize to bytes
+	case 16: // Decimal128
+		v, err := d.getValToDecimal(val)
 		if err != nil {
 			return err
 		}
 
-		x := uint64(v * factors10[d.scale])           // apply scale factor
-		binary.LittleEndian.PutUint64(d.raw[i*8:], x) // serialize to bytes
+		bi := v.Shift(int32(d.scale)).BigInt()
 
-	case 16:
-		v, err := d.getDecimalToBigFloat(decimal)
+		// the conditional structure is for optimization purpose
+		// comparing big.Int is a costly operation
+		// while calling BitLen is very fast
+		if bi.BitLen() > maxBitLenDecimal128 || (bi.BitLen() == maxBitLenDecimal128 && new(big.Int).Abs(bi).Cmp(biggestInt128With38Digits) > 0) {
+			return errors.ErrorfWithCaller(valueOverFlowsErr, d.precision)
+		}
+
+		putBigIntLittleEndianImpl(d.raw[i*16:(i+1)*16], bi)
+	case 32: // Decimal256
+		v, err := d.getValToDecimal(val)
 		if err != nil {
 			return err
 		}
 
-		factor := new(big.Float).SetFloat64(factors10[d.scale])
+		bi := v.Shift(int32(d.scale)).BigInt()
 
-		v = v.Mul(v, factor) // apply scale factor
-		z := new(big.Int)    // serialize as 16-byte integer (int128)
-		v.Int(z)
-
-		// NOTE: can panic if value of z >= 10^39 - 1.
-		// For value beyond this threshold, it needs more than 16 bytes.
-		buff := d.raw[i*16 : (i+1)*16]
-		z.FillBytes(buff)
-
-		// Reverse byte-by-byte from big to little endian
-		for i, j := 0, len(buff)-1; i < j; i, j = i+1, j-1 {
-			buff[i], buff[j] = buff[j], buff[i]
+		// the conditional structure is for optimization purpose
+		// comparing big.Int is a costly operation
+		// while calling BitLen is very fast
+		if bi.BitLen() > maxBitLenDecimal256 || (bi.BitLen() == maxBitLenDecimal256 && new(big.Int).Abs(bi).Cmp(biggestInt256With76Digits) > 0) {
+			return errors.ErrorfWithCaller(valueOverFlowsErr, d.precision)
 		}
 
+		putBigIntLittleEndianImpl(d.raw[i*32:(i+1)*32], bi)
 	default:
 		panic(errors.ErrorfWithCaller(unreachableExecutionErr))
 	}
@@ -256,52 +281,44 @@ func (d *DecimalColumnData) putDecimalIntoBytes(i int, decimal interface{}) erro
 	return nil
 }
 
-func (d *DecimalColumnData) getDecimalToFloat64(decimal interface{}) (float64, error) {
-	switch v := decimal.(type) {
-	case float64:
-		return float64(v), nil
-	case float32:
-		return float64(v), nil
-	case int:
-		return float64(v), nil
+func (d *DecimalColumnData) getValToDecimal(val interface{}) (decimal.Decimal, error) {
+	switch v := val.(type) {
+	case int: // at least 32 bits in size, It is a distinct type, however, and not an alias for, say, int32.
+		return decimal.NewFromInt(int64(v)), nil
 	case int8:
-		return float64(v), nil
+		return decimal.NewFromInt32(int32(v)), nil
 	case int16:
-		return float64(v), nil
+		return decimal.NewFromInt32(int32(v)), nil
 	case int32:
-		return float64(v), nil
+		return decimal.NewFromInt32(v), nil
 	case int64:
-		return float64(v), nil
-	case uint:
-		return float64(v), nil
-	case uint8:
-		return float64(v), nil
-	case uint16:
-		return float64(v), nil
-	case uint32:
-		return float64(v), nil
-	case uint64:
-		return float64(v), nil
-	default:
-		return 0.0, NewErrInvalidColumnType(v, 0.0)
-	}
-}
-
-func (d *DecimalColumnData) getDecimalToBigFloat(decimal interface{}) (*big.Float, error) {
-	switch v := decimal.(type) {
-	case *big.Float:
+		return decimal.NewFromInt(v), nil
+	case uint: // cast up
+		return decimal.NewFromInt(int64(v)), nil
+	case uint8: // cast up
+		return decimal.NewFromInt32(int32(v)), nil
+	case uint16: // cast up
+		return decimal.NewFromInt32(int32(v)), nil
+	case uint32: // cast up
+		return decimal.NewFromInt(int64(v)), nil
+	case uint64: // cast up
+		return decimal.NewFromString(strconv.FormatUint(v, 10))
+	case float64:
+		return decimal.NewFromFloat(v), nil
+	case float32:
+		return decimal.NewFromFloat32(v), nil
+	case big.Int:
+		return decimal.NewFromString(v.String())
+	case decimal.Decimal:
 		return v, nil
-
+	case *big.Float:
+		return decimal.NewFromString(v.String())
 	case *big.Int:
-		return new(big.Float).SetInt(v), nil
-
+		return decimal.NewFromString(v.String())
+	case *decimal.Decimal:
+		return *v, nil
 	default:
-		f64, err := d.getDecimalToFloat64(decimal)
-		if err != nil {
-			return nil, err
-		}
-
-		return big.NewFloat(f64), nil
+		return decimal.Decimal{}, NewErrInvalidColumnType(v, 0.0)
 	}
 }
 
@@ -323,8 +340,4 @@ func getByteCountFromPrecision(p int) int {
 		return result
 	}
 	return result << 1
-}
-
-func makeDecimalFmtTemplate(scale int) string {
-	return "%" + fmt.Sprintf(".%vf", scale)
 }

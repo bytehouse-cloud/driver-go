@@ -12,6 +12,13 @@ import (
 )
 
 func TestDateTimeColumnData_ReadFromTexts(t *testing.T) {
+	prevTz := time.Local
+
+	time.Local = time.UTC
+	defer func() {
+		time.Local = prevTz
+	}()
+
 	type args struct {
 		texts []string
 	}
@@ -52,11 +59,15 @@ func TestDateTimeColumnData_ReadFromTexts(t *testing.T) {
 		{
 			name: "Should write data and return number of rows read with no error if empty string",
 			args: args{
-				texts: []string{"", "1970-01-02 15:04:05", "2020-01-02 15:04:05"},
+				texts: []string{"", "1970-01-02 15:04:05", "2020-01-02 15:04:05", "null"},
 			},
-			wantDataWrittenInOutputFormat: []string{zeroTime.String()[:19], "1970-01-02 15:04:05", "2020-01-02 15:04:05"},
-			wantRowsRead:                  3,
-			wantErr:                       false,
+			wantDataWrittenInOutputFormat: []string{
+				time.Unix(0, 0).In(time.Local).String()[:19],
+				"1970-01-02 15:04:05",
+				"2020-01-02 15:04:05",
+				time.Unix(0, 0).In(time.Local).String()[:19]},
+			wantRowsRead: 4,
+			wantErr:      false,
 		},
 		{
 			name: "Should throw error if invalid time format",
@@ -130,10 +141,10 @@ func TestDateTimeColumnData_ReadFromValues(t *testing.T) {
 			name: "Should return the same time value",
 			args: args{
 				values: []interface{}{
-					time.Now(), time.Now(),
+					time.Now(), time.Now(), nil,
 				},
 			},
-			want:    2,
+			want:    3,
 			wantErr: false,
 		},
 		{
@@ -163,6 +174,12 @@ func TestDateTimeColumnData_ReadFromValues(t *testing.T) {
 }
 
 func TestDateTimeColumnData_EncoderDecoder(t *testing.T) {
+
+	prevTz := time.Local
+	time.Local = time.UTC
+	defer func() {
+		time.Local = prevTz
+	}()
 	type args struct {
 		texts []string
 	}
@@ -195,13 +212,15 @@ func TestDateTimeColumnData_EncoderDecoder(t *testing.T) {
 			args: args{
 				texts: []string{"", "1970-01-02 15:04:05", "2020-01-02 15:04:05"},
 			},
-			wantDataWritten: []string{zeroTime.String()[:19], "1970-01-02 15:04:05", "2020-01-02 15:04:05"},
+			wantDataWritten: []string{time.Unix(0, 0).In(time.Local).String()[:19], "1970-01-02 15:04:05", "2020-01-02 15:04:05"},
 			wantRowsRead:    3,
 			wantErr:         false,
 		},
 	}
 	for _, tt := range tests {
+
 		t.Run(tt.name, func(t *testing.T) {
+
 			var buffer bytes.Buffer
 			encoder := ch_encoding.NewEncoder(&buffer)
 			decoder := ch_encoding.NewDecoder(&buffer)
@@ -235,5 +254,6 @@ func TestDateTimeColumnData_EncoderDecoder(t *testing.T) {
 			require.NoError(t, original.Close())
 			require.NoError(t, newCopy.Close())
 		})
+
 	}
 }

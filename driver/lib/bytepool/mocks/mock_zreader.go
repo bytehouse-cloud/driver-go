@@ -1,6 +1,10 @@
 package mocks
 
-import "github.com/bytehouse-cloud/driver-go/driver/lib/bytepool"
+import (
+	"io"
+
+	"github.com/bytehouse-cloud/driver-go/driver/lib/bytepool"
+)
 
 type fakedReader struct{}
 
@@ -9,5 +13,6 @@ func (reader *fakedReader) Read(p []byte) (n int, err error) {
 }
 
 func NewFakedZReader() *bytepool.ZReader {
-	return bytepool.NewZReaderDefault(&fakedReader{})
+	var reader io.Reader = &fakedReader{}
+	return bytepool.NewZReaderDefault(&reader)
 }

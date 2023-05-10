@@ -44,6 +44,11 @@ func (d *DateTimeColumnData) ReadFromValues(values []interface{}) (int, error) {
 	)
 
 	for i, value := range values {
+		if value == nil {
+			binary.LittleEndian.PutUint32(d.raw[i*dateTimeLen:], 0)
+			continue
+		}
+
 		t, ok = value.(time.Time)
 		if !ok {
 			return i, NewErrInvalidColumnType(value, t)
@@ -63,7 +68,7 @@ func (d *DateTimeColumnData) ReadFromTexts(texts []string) (int, error) {
 	parseTime := interpretTimeFormat(supportedDateTimeFormats, texts, d.timeZone)
 
 	for i, text := range texts {
-		if text == "" {
+		if isEmptyOrNull(text) {
 			binary.LittleEndian.PutUint32(d.raw[i*dateTimeLen:], 0)
 			continue
 		}

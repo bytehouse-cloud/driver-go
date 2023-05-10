@@ -54,13 +54,15 @@ func TestIPv4ColumnData_ReadFromTexts(t *testing.T) {
 			name: "Should return zero values if is empty",
 			args: args{
 				texts: []string{
-					"", "::ffff:192.0.2.1",
+					"", "::ffff:192.0.2.1", "null",
 				},
 			},
 			wantDataWritten: []net.IP{
-				net.IPv4(0, 0, 0, 0), net.ParseIP("192.0.2.1"),
+				net.IPv4(0, 0, 0, 0),
+				net.ParseIP("192.0.2.1"),
+				net.IPv4(0, 0, 0, 0),
 			},
-			want:    2,
+			want:    3,
 			wantErr: false,
 		},
 		{
@@ -142,10 +144,10 @@ func TestIPv4ColumnData_ReadFromValues(t *testing.T) {
 			name: "Should return values read if is ipv4",
 			args: args{
 				values: []interface{}{
-					net.ParseIP("192.0.2.1"), net.ParseIP("192.0.2.10"),
+					net.ParseIP("192.0.2.1"), net.ParseIP("192.0.2.10"), nil,
 				},
 			},
-			want:    2,
+			want:    3,
 			wantErr: false,
 		},
 		{
@@ -200,6 +202,9 @@ func TestIPv4ColumnData_ReadFromValues(t *testing.T) {
 			assert.Equal(t, tt.want, got)
 
 			for idx, value := range tt.args.values {
+				if value == nil {
+					value = zeroIPv4String
+				}
 				assert.Equal(t, fmt.Sprint(value), fmt.Sprint(i.GetValue(idx)))
 			}
 		})
