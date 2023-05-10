@@ -5,13 +5,12 @@ import (
 	"testing"
 	"time"
 
+	"github.com/bytehouse-cloud/driver-go/driver/lib/ch_encoding"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-
-	"github.com/bytehouse-cloud/driver-go/driver/lib/ch_encoding"
 )
 
-func TestDateColumnData_ReadFromTexts(t *testing.T) {
+func TestDate32ColumnData_ReadFromTexts(t *testing.T) {
 	type args struct {
 		texts []string
 	}
@@ -29,6 +28,15 @@ func TestDateColumnData_ReadFromTexts(t *testing.T) {
 			},
 			wantRowsRead: 3,
 			wantErr:      false,
+		},
+		{
+			name: "Should write max and min data in yyyy-MM-dd format and return number of rows read with no error",
+			args: args{
+				texts: []string{"2299-12-31", "1900-01-01"},
+			},
+			wantDataWritten: []string{"2299-12-31", "1900-01-01"},
+			wantRowsRead:    2,
+			wantErr:         false,
 		},
 		{
 			name: "Should write data in yyyy-M-d format and return number of rows read with no error",
@@ -354,26 +362,10 @@ func TestDateColumnData_ReadFromTexts(t *testing.T) {
 			wantRowsRead: 1,
 			wantErr:      true,
 		},
-		{
-			name: "Should throw error if date is earlier than 1970-01-01",
-			args: args{
-				texts: []string{"1900-01-01", "1970-01-02"},
-			},
-			wantRowsRead: 0,
-			wantErr:      true,
-		},
-		{
-			name: "Should throw error if date is later than 2149-06-06",
-			args: args{
-				texts: []string{"1970-01-01", "2022-08-14", "2149-06-07"},
-			},
-			wantRowsRead: 2,
-			wantErr:      true,
-		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			i := MustMakeColumnData(DATE, 1000)
+			i := MustMakeColumnData(DATE32, 1000)
 
 			got, err := i.ReadFromTexts(tt.args.texts)
 			if tt.wantErr {
@@ -403,7 +395,7 @@ func TestDateColumnData_ReadFromTexts(t *testing.T) {
 	}
 }
 
-func TestDateColumnData_ReadFromValues(t *testing.T) {
+func TestDateColumnData32_ReadFromValues(t *testing.T) {
 	type args struct {
 		values []interface{}
 	}
@@ -436,7 +428,7 @@ func TestDateColumnData_ReadFromValues(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			d := MustMakeColumnData(DATE, 1000)
+			d := MustMakeColumnData(DATE32, 1000)
 			got, err := d.ReadFromValues(tt.args.values)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("ReadFromValues() error = %v, wantErr %v", err, tt.wantErr)
@@ -449,7 +441,7 @@ func TestDateColumnData_ReadFromValues(t *testing.T) {
 	}
 }
 
-func TestDateColumnData_EncoderDecoder(t *testing.T) {
+func TestDateColumnData32_EncoderDecoder(t *testing.T) {
 	type args struct {
 		texts []string
 	}
@@ -467,6 +459,15 @@ func TestDateColumnData_EncoderDecoder(t *testing.T) {
 			},
 			wantDataWritten: []string{"1970-01-02", "2020-01-02", "2019-01-01"},
 			wantRowsRead:    3,
+			wantErr:         false,
+		},
+		{
+			name: "Should write max and min data in yyyy-MM-dd format and return number of rows read with no error",
+			args: args{
+				texts: []string{"2299-12-31", "1900-01-01"},
+			},
+			wantDataWritten: []string{"2299-12-31", "1900-01-01"},
+			wantRowsRead:    2,
 			wantErr:         false,
 		},
 		{
@@ -495,7 +496,7 @@ func TestDateColumnData_EncoderDecoder(t *testing.T) {
 			decoder := ch_encoding.NewDecoder(&buffer)
 
 			// Write to encoder
-			original := MustMakeColumnData("Date", len(tt.args.texts))
+			original := MustMakeColumnData(DATE32, len(tt.args.texts))
 			got, err := original.ReadFromTexts(tt.args.texts)
 			if tt.wantErr {
 				require.Error(t, err)
@@ -508,7 +509,7 @@ func TestDateColumnData_EncoderDecoder(t *testing.T) {
 			require.NoError(t, err)
 
 			// Read from decoder
-			newCopy := MustMakeColumnData("Date", len(tt.args.texts))
+			newCopy := MustMakeColumnData(DATE32, len(tt.args.texts))
 			err = newCopy.ReadFromDecoder(decoder)
 
 			for index, value := range tt.wantDataWritten {

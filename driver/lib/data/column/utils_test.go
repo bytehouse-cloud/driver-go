@@ -334,7 +334,7 @@ func Test_getDateTime64Param(t *testing.T) {
 				t: "DateTime64(10)",
 			},
 			wantPrecision: 10,
-			wantLocation:  time.UTC,
+			wantLocation:  nil,
 		},
 		{
 			name: "Test if have location can get location",

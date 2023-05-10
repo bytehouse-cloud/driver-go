@@ -16,6 +16,8 @@ var (
 	NESTED_TYPE_ERROR = fmt.Errorf("[parseNestedType]: failed to pass nested type")
 )
 
+const timeMaxScale = 9
+
 const (
 	// base type
 	INT8         CHColumnType = "Int8"
@@ -28,17 +30,19 @@ const (
 	UINT16       CHColumnType = "UInt16"
 	UINT32       CHColumnType = "UInt32"
 	UINT64       CHColumnType = "UInt64"
+	UINT128      CHColumnType = "UInt128"
 	UINT256      CHColumnType = "UInt256"
 	FLOAT32      CHColumnType = "Float32"
 	FLOAT64      CHColumnType = "Float64"
 	STRING       CHColumnType = "String"
 	UUID         CHColumnType = "UUID"
 	DATE         CHColumnType = "Date"
+	DATE32       CHColumnType = "Date32"
 	IPV4         CHColumnType = "IPv4"
 	IPV6         CHColumnType = "IPv6"
 	BITMAP64     CHColumnType = "BitMap64"
 	NOTHING      CHColumnType = "Nothing"
-	BOOLEAN      CHColumnType = "Boolean"
+	BOOL         CHColumnType = "Bool"
 	POINT        CHColumnType = "Point"
 	RING         CHColumnType = "Ring"
 	POLYGON      CHColumnType = "Polygon"
@@ -57,7 +61,7 @@ const (
 	DATETIME       CHColumnType = "DateTime"
 	DATETIME64     CHColumnType = "DateTime64"
 	LOWCARDINALITY CHColumnType = "LowCardinality"
-
+	TIME           CHColumnType = "Time"
 	// alias types
 	INT CHColumnType = "Int"
 
@@ -107,13 +111,13 @@ func MustGenerateColumnDataFactory(t CHColumnType) GenerateColumnData {
 func generateComplex(t CHColumnType, location *time.Location) (GenerateColumnData, error) {
 	switch {
 	case strings.HasPrefix(string(t), string(NULLABLE)):
-		return makeNullableColumnData(t)
+		return makeNullableColumnData(t, location)
 	case strings.HasPrefix(string(t), string(ARRAY)):
-		return makeArrayColumnData(t)
+		return makeArrayColumnData(t, location)
 	case strings.HasPrefix(string(t), string(TUPLE)):
-		return makeTupleColumnData(t)
+		return makeTupleColumnData(t, location)
 	case strings.HasPrefix(string(t), string(MAP)):
-		return makeMapColumnData(t)
+		return makeMapColumnData(t, location)
 	case strings.HasPrefix(string(t), string(FIXEDSTRING)):
 		return makeFixedStringColumnData(t)
 	case strings.HasPrefix(string(t), string(ENUM8)):
@@ -127,7 +131,7 @@ func generateComplex(t CHColumnType, location *time.Location) (GenerateColumnDat
 	case strings.HasPrefix(string(t), string(DATETIME)):
 		return makeDateTimeColumnData(t, location)
 	case strings.HasPrefix(string(t), string(LOWCARDINALITY)):
-		return makeLowCardinality(t)
+		return makeLowCardinality(t, location)
 	case strings.HasPrefix(string(t), string(SIMPLEAGGREATEFUNCTION)):
 		nestedType, err := parseNestedType(string(t), string(SIMPLEAGGREATEFUNCTION))
 		if err != nil {
@@ -163,6 +167,8 @@ func generateComplex(t CHColumnType, location *time.Location) (GenerateColumnDat
 
 		return baseImpl, nil
 
+	case strings.HasPrefix(string(t), string(TIME)):
+		return makeTimeColumnData(t)
 	default:
 		return nil, fmt.Errorf("unsupported data type: %v", t)
 	}
@@ -193,6 +199,22 @@ var basicDataTypeImpl = map[CHColumnType]func(numRows int) CHColumnData{
 		}
 	},
 
+	INT128: func(numRows int) CHColumnData {
+		return &BigIntColumnData{
+			byteCount: 16,
+			isSigned:  true,
+			raw:       bytepool.GetBytesWithLen(numRows * 16),
+		}
+	},
+
+	INT256: func(numRows int) CHColumnData {
+		return &BigIntColumnData{
+			byteCount: 32,
+			isSigned:  true,
+			raw:       bytepool.GetBytesWithLen(numRows * 32),
+		}
+	},
+
 	UINT8: func(numRows int) CHColumnData {
 		return &UInt8ColumnData{
 			raw: bytepool.GetBytesWithLen(numRows),
@@ -214,6 +236,22 @@ var basicDataTypeImpl = map[CHColumnType]func(numRows int) CHColumnData{
 	UINT64: func(numRows int) CHColumnData {
 		return &UInt64ColumnData{
 			raw: bytepool.GetBytesWithLen(numRows * 8),
+		}
+	},
+
+	UINT128: func(numRows int) CHColumnData {
+		return &BigIntColumnData{
+			byteCount: 16,
+			isSigned:  false,
+			raw:       bytepool.GetBytesWithLen(numRows * 16),
+		}
+	},
+
+	UINT256: func(numRows int) CHColumnData {
+		return &BigIntColumnData{
+			byteCount: 32,
+			isSigned:  false,
+			raw:       bytepool.GetBytesWithLen(numRows * 32),
 		}
 	},
 
@@ -259,6 +297,12 @@ var basicDataTypeImpl = map[CHColumnType]func(numRows int) CHColumnData{
 		}
 	},
 
+	DATE32: func(numRows int) CHColumnData {
+		return &Date32ColumnData{
+			raw: bytepool.GetBytesWithLen(numRows * date32Len),
+		}
+	},
+
 	IPV4: func(numRows int) CHColumnData {
 		return &IPv4ColumnData{
 			raw: bytepool.GetBytesWithLen(numRows * net.IPv4len),
@@ -274,6 +318,12 @@ var basicDataTypeImpl = map[CHColumnType]func(numRows int) CHColumnData{
 	BITMAP64: func(numRows int) CHColumnData {
 		return &BitMapColumnData{
 			raw: make([][]byte, numRows),
+		}
+	},
+
+	BOOL: func(numRows int) CHColumnData {
+		return &BoolColumnData{
+			raw: bytepool.GetBytesWithLen(numRows),
 		}
 	},
 
@@ -300,6 +350,10 @@ func makeDateTimeColumnData(t CHColumnType, location *time.Location) (GenerateCo
 		location = loc
 	}
 
+	if location == nil {
+		location = time.Local
+	}
+
 	return func(numRows int) CHColumnData {
 		return &DateTimeColumnData{
 			timeZone: location,
@@ -317,6 +371,10 @@ func makeDateTime64ColumnData(t CHColumnType, location *time.Location) (Generate
 		location = loc
 	}
 
+	if location == nil {
+		location = time.Local
+	}
+
 	return func(numRows int) CHColumnData {
 		return &DateTime64ColumnData{
 			precision: precision,
@@ -324,6 +382,30 @@ func makeDateTime64ColumnData(t CHColumnType, location *time.Location) (Generate
 			raw:       bytepool.GetBytesWithLen(numRows * dateTime64Len),
 		}
 	}, nil
+}
+
+func makeTimeColumnData(t CHColumnType) (GenerateColumnData, error) {
+
+	scale, err := getTimeParam(t)
+	if err != nil {
+		return nil, err
+	}
+
+	if scale > timeMaxScale {
+		return nil, fmt.Errorf("unsupported scale, maximum is %v", timeMaxScale)
+	}
+	return func(numRows int) CHColumnData {
+		return &TimeColumnData{
+			scale: scale,
+			baseColumn: &DecimalColumnData{
+				precision: 18, // decimal64 precision
+				scale:     scale,
+				byteCount: 8, // decimal64
+				raw:       bytepool.GetBytesWithLen(numRows * 8),
+			},
+		}
+	}, nil
+
 }
 
 func makeDecimalColumnData(t CHColumnType) (GenerateColumnData, error) {
@@ -338,15 +420,14 @@ func makeDecimalColumnData(t CHColumnType) (GenerateColumnData, error) {
 	if err != nil {
 		return nil, err
 	}
-	byteCount := getByteCountFromPrecision(precision)
 
+	byteCount := getByteCountFromPrecision(precision)
 	return func(numRows int) CHColumnData {
 		return &DecimalColumnData{
-			precision:   precision,
-			scale:       scale,
-			byteCount:   getByteCountFromPrecision(precision),
-			fmtTemplate: makeDecimalFmtTemplate(scale),
-			raw:         bytepool.GetBytesWithLen(numRows * byteCount),
+			precision: precision,
+			scale:     scale,
+			byteCount: getByteCountFromPrecision(precision),
+			raw:       bytepool.GetBytesWithLen(numRows * byteCount),
 		}
 	}, nil
 }
@@ -435,27 +516,29 @@ func makeMapKeyValue(t CHColumnType) (key CHColumnType, value CHColumnType) {
 	return key, value
 }
 
-func makeMapColumnData(t CHColumnType) (GenerateColumnData, error) {
+func makeMapColumnData(t CHColumnType, location *time.Location) (GenerateColumnData, error) {
 	key, value := makeMapKeyValue(t)
-	generateKeys, err := generateColumnDataFactoryOptionalTypeName(key)
+	generateKeys, err := generateColumnDataFactoryOptionalTypeName(key, location)
 	if err != nil {
 		return nil, err
 	}
-	generateValues, err := generateColumnDataFactoryOptionalTypeName(value)
+	generateValues, err := generateColumnDataFactoryOptionalTypeName(value, location)
 	if err != nil {
 		return nil, err
 	}
 
 	return func(numRows int) CHColumnData {
 		return &MapColumnData{
-			offsetsRaw:     bytepool.GetBytesWithLen(numRows * 8),
-			generateKeys:   generateKeys,
-			generateValues: generateValues,
+			offsetsRaw:      bytepool.GetBytesWithLen(numRows * 8),
+			generateKeys:    generateKeys,
+			generateValues:  generateValues,
+			keyColumnData:   generateKeys(numRows),
+			valueColumnData: generateValues(numRows),
 		}
 	}, nil
 }
 
-func makeTupleColumnData(t CHColumnType) (GenerateColumnData, error) {
+func makeTupleColumnData(t CHColumnType, location *time.Location) (GenerateColumnData, error) {
 	tupleElemTypeString := t[6 : len(t)-1] // Tuple(Type1, Type2, ...)
 	strIter := commaIterator(string(tupleElemTypeString))
 	var generates []GenerateColumnData
@@ -464,7 +547,7 @@ func makeTupleColumnData(t CHColumnType) (GenerateColumnData, error) {
 		if !ok {
 			break
 		}
-		colDataGen, err := generateColumnDataFactoryOptionalTypeName(CHColumnType(s))
+		colDataGen, err := generateColumnDataFactoryOptionalTypeName(CHColumnType(s), location)
 		if err != nil {
 			return nil, err
 		}
@@ -482,8 +565,8 @@ func makeTupleColumnData(t CHColumnType) (GenerateColumnData, error) {
 	}, nil
 }
 
-func makeArrayColumnData(t CHColumnType) (GenerateColumnData, error) {
-	generateInnerData, err := generateColumnDataFactoryOptionalTypeName(t[6 : len(t)-1]) // Array(innerType) -> innerType
+func makeArrayColumnData(t CHColumnType, location *time.Location) (GenerateColumnData, error) {
+	generateInnerData, err := generateColumnDataFactoryOptionalTypeName(t[6:len(t)-1], location) // Array(innerType) -> innerType
 	if err != nil {
 		return nil, err
 	}
@@ -492,13 +575,14 @@ func makeArrayColumnData(t CHColumnType) (GenerateColumnData, error) {
 		return &ArrayColumnData{
 			offsetsRaw:        bytepool.GetBytesWithLen(numRows * 8),
 			generateInnerData: generateInnerData,
+			innerColumnData:   generateInnerData(numRows),
 		}
 	}, nil
 }
 
-func makeNullableColumnData(t CHColumnType) (GenerateColumnData, error) {
+func makeNullableColumnData(t CHColumnType, location *time.Location) (GenerateColumnData, error) {
 	innerType := t[9 : len(t)-1]
-	generateInnerData, err := generateColumnDataFactoryOptionalTypeName(innerType) // Nullable(innerType) -> innerType
+	generateInnerData, err := generateColumnDataFactoryOptionalTypeName(innerType, location) // Nullable(innerType) -> innerType
 	if err != nil {
 		return nil, err
 	}
@@ -511,14 +595,14 @@ func makeNullableColumnData(t CHColumnType) (GenerateColumnData, error) {
 	}, nil
 }
 
-func makeLowCardinality(t CHColumnType) (GenerateColumnData, error) {
+func makeLowCardinality(t CHColumnType, location *time.Location) (GenerateColumnData, error) {
 	var isNullable bool
 	innerType := t[15 : len(t)-1]
 	if strings.HasPrefix(string(innerType), string(NULLABLE)) {
 		innerType = innerType[9 : len(innerType)-1]
 		isNullable = true
 	}
-	generateKeys, err := generateColumnDataFactoryOptionalTypeName(innerType) // LowCardinality(innerType) -> innerType
+	generateKeys, err := generateColumnDataFactoryOptionalTypeName(innerType, location) // LowCardinality(innerType) -> innerType
 	if err != nil {
 		return nil, err
 	}
@@ -538,8 +622,8 @@ func makeLowCardinality(t CHColumnType) (GenerateColumnData, error) {
 // generateColumnDataFactoryOptionalTypeName is similar to GenerateColumnDataFactory
 // but allows type name before the type, e.g. "a Int32".
 // this will be useful in accepting types like "Array(a Int32)"
-func generateColumnDataFactoryOptionalTypeName(t CHColumnType) (GenerateColumnData, error) {
-	gen, err := GenerateColumnDataFactory(t)
+func generateColumnDataFactoryOptionalTypeName(t CHColumnType, location *time.Location) (GenerateColumnData, error) {
+	gen, err := GenerateColumnDataFactoryWithLocation(t, location)
 	if err == nil {
 		return gen, nil
 	}
@@ -549,7 +633,7 @@ func generateColumnDataFactoryOptionalTypeName(t CHColumnType) (GenerateColumnDa
 	}
 
 	colTypeTrunc := CHColumnType(strings.TrimSpace(string(t[i:])))
-	return GenerateColumnDataFactory(colTypeTrunc)
+	return GenerateColumnDataFactoryWithLocation(colTypeTrunc, location)
 }
 
 func parseNestedType(chColumnType, prefix string) (CHColumnType, error) {

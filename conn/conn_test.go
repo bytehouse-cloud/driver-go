@@ -437,6 +437,28 @@ func TestGatewayConn_SettingsChecked(t *testing.T) {
 			},
 		},
 		{
+			name: "Test is ansi sql mode if added setting as ANSI",
+			test: func(t *testing.T) {
+				g := &GatewayConn{
+					settings: make(map[string]interface{}),
+				}
+
+				g.AddSettingChecked("dialect_type", "ANSI")
+				require.True(t, g.InAnsiSQLMode())
+			},
+		},
+		{
+			name: "Test is ansi sql mode if added setting MYSQL",
+			test: func(t *testing.T) {
+				g := &GatewayConn{
+					settings: make(map[string]interface{}),
+				}
+
+				g.AddSettingChecked("dialect_type", "MYSQL")
+				require.False(t, g.InAnsiSQLMode())
+			},
+		},
+		{
 			name: "Test is not ansi sql mode if added setting as false",
 			test: func(t *testing.T) {
 				g := &GatewayConn{
@@ -459,6 +481,18 @@ func TestGatewayConn_SettingsChecked(t *testing.T) {
 				g = &GatewayConn{
 					settings: make(map[string]interface{}),
 				}
+				require.False(t, g.InAnsiSQLMode())
+			},
+		},
+		{
+			name: "Test if both settings are given THEN prioritize dialect type",
+			test: func(t *testing.T) {
+				g := &GatewayConn{
+					settings: make(map[string]interface{}),
+				}
+
+				g.AddSettingChecked("dialect_type", "MYSQL")
+				g.AddSettingChecked("ansi_sql", true)
 				require.False(t, g.InAnsiSQLMode())
 			},
 		},

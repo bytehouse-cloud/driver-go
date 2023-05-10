@@ -13,7 +13,7 @@ import (
 	"github.com/bytehouse-cloud/driver-go/stream/format/helper"
 )
 
-//TODO: add option to be able to read \uXXXX as an escaped character
+// TODO: add option to be able to read \uXXXX as an escaped character
 
 type JSONBlockStreamFmtReader struct {
 	zReader      *bytepool.ZReader
@@ -22,12 +22,12 @@ type JSONBlockStreamFmtReader struct {
 
 func NewJSONBlockStreamFmtReader(r io.Reader) *JSONBlockStreamFmtReader {
 	return &JSONBlockStreamFmtReader{
-		zReader: bytepool.NewZReaderDefault(r),
+		zReader: bytepool.NewZReaderDefault(&r),
 	}
 }
 
 func (j *JSONBlockStreamFmtReader) ReadFirstRow(fb *bytepool.FrameBuffer, cols []*column.CHColumn) (err error) {
-	//return j.readRow(fb, cols)
+	// return j.readRow(fb, cols)
 	if err := j.readRow(fb, cols); err != nil {
 		return fmt.Errorf("error in first row %s", err)
 	}
@@ -239,7 +239,8 @@ func (j *JSONBlockStreamFmtReader) readStringUntilQuote(fb *bytepool.FrameBuffer
 // 2. Have meta field e.g. {"meta": [.................], "data": [...]}
 // Either ways it will skip to the first square brace in the data field
 // e.g. {..., "data": [...]}
-//                    ^ here
+//
+// ///////////////////^ here
 func (j *JSONBlockStreamFmtReader) skipMeta() error {
 	// the second encountered [ denotes the start of data
 	var countRead int

@@ -6,6 +6,7 @@ import (
 	"io/ioutil"
 	"testing"
 
+	"github.com/bytehouse-cloud/driver-go/utils/pointer"
 	"github.com/stretchr/testify/assert"
 
 	"github.com/bytehouse-cloud/driver-go/driver/lib/bytepool"
@@ -56,7 +57,7 @@ func TestDiscardUntilByteEscaped(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			zReader := bytepool.NewZReader(bytes.NewReader(tt.input), 3, 2)
+			zReader := bytepool.NewZReader(pointer.IoReader(bytes.NewReader(tt.input)), 3, 2)
 			err := DiscardUntilByteEscaped(zReader, stop)
 			if !assert.Equal(t, tt.err, err) {
 				return

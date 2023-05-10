@@ -443,3 +443,225 @@ func TestReadFromColumnValues_MoreRowsThanColumns_SecondColGotError(t *testing.T
 	assert.Equal(t, rowsRead, 3)
 	assert.Equal(t, colsRead, 1)
 }
+
+func TestReadFromColumnsValueToBlock_ThenWriteToEncoder_ThenDecodeBack(t *testing.T) {
+	type args struct {
+		data     [][]interface{}
+		colNames []string
+		colTypes []column.CHColumnType
+		numRows  int
+	}
+	type testCase struct {
+		name string
+		args args
+	}
+
+	testCases := []testCase{
+		{
+			name: "IF Empty map data THEN no error happens",
+			args: args{
+				data:     [][]interface{}{},
+				colNames: []string{"map_col"},
+				colTypes: []column.CHColumnType{
+					column.CHColumnType("Map(String, String)"),
+				},
+				numRows: 0,
+			},
+		},
+		{
+			name: "IF non empty map data THEN no error happens",
+			args: args{
+				data: [][]interface{}{
+					{
+						map[string]string{},
+						map[string]string{"tai": "nmba"},
+					},
+				},
+				colNames: []string{"map_col"},
+				colTypes: []column.CHColumnType{
+					column.CHColumnType("Map(String, String)"),
+				},
+				numRows: 2,
+			},
+		},
+		{
+			name: "IF empty array data THEN no error happens",
+			args: args{
+				data:     [][]interface{}{},
+				colNames: []string{"array_col"},
+				colTypes: []column.CHColumnType{
+					column.CHColumnType("Array(String)"),
+				},
+				numRows: 0,
+			},
+		},
+		{
+			name: "IF non-empty array data THEN no error happens",
+			args: args{
+				data: [][]interface{}{
+					{
+						[]string{
+							"tai",
+							"nmba",
+						},
+						[]string{
+							"26072000",
+							"25042003",
+						},
+					},
+				},
+				colNames: []string{"array_col"},
+				colTypes: []column.CHColumnType{
+					column.CHColumnType("Array(String)"),
+				},
+				numRows: 2,
+			},
+		},
+		{
+			name: "IF empty low cardinality data THEN no error happens",
+			args: args{
+				data:     [][]interface{}{},
+				colNames: []string{"low_cardinality_col"},
+				colTypes: []column.CHColumnType{
+					column.CHColumnType("LowCardinality(String)"),
+				},
+				numRows: 0,
+			},
+		},
+		{
+			name: "IF non-empty low cardinality data THEN no error happens",
+			args: args{
+				data: [][]interface{}{
+					{
+						"tai",
+						"nmba",
+					},
+				},
+				colNames: []string{"low_cardinality_col"},
+				colTypes: []column.CHColumnType{
+					column.CHColumnType("LowCardinality(String)"),
+				},
+				numRows: 2,
+			},
+		},
+		{
+			name: "IF empty nullable map column data THEN no error happens",
+			args: args{
+				data:     [][]interface{}{},
+				colNames: []string{"nullable_map_col"},
+				colTypes: []column.CHColumnType{
+					column.CHColumnType("Nullable(Map(String, UInt8))"),
+				},
+				numRows: 0,
+			},
+		},
+		{
+			name: "IF non-empty nullable map column data THEN no error happens",
+			args: args{
+				data: [][]interface{}{
+					{
+						nil,
+						map[interface{}]interface{}{
+							"tai":  uint64(26072000),
+							"nmba": uint64(25042003),
+						},
+					},
+				},
+				colNames: []string{"nullable_map_col"},
+				colTypes: []column.CHColumnType{
+					column.CHColumnType("Nullable(Map(String, UInt64))"),
+				},
+				numRows: 2,
+			},
+		},
+		{
+			name: "IF empty nullable array column data THEN no error happens",
+			args: args{
+				data:     [][]interface{}{},
+				colNames: []string{"nullable_array_col"},
+				colTypes: []column.CHColumnType{
+					column.CHColumnType("Nullable(Array(UInt8))"),
+				},
+				numRows: 0,
+			},
+		},
+		{
+			name: "IF non-empty nullable array column data THEN no error happens",
+			args: args{
+				data: [][]interface{}{
+					{
+						nil,
+						[]uint8{
+							uint8(1),
+							uint8(1),
+						},
+					},
+				},
+				colNames: []string{"nullable_array_col"},
+				colTypes: []column.CHColumnType{
+					column.CHColumnType("Nullable(Array(UInt8))"),
+				},
+				numRows: 2,
+			},
+		},
+		{
+			name: "IF empty nullable nested column data type Array(Array(Map(String, UInt64))) THEN no error happens",
+			args: args{
+				data:     [][]interface{}{},
+				colNames: []string{"nullable_nested_array_col"},
+				colTypes: []column.CHColumnType{
+					column.CHColumnType("Nullable(Array(Array(Map(String, UInt64))))"),
+				},
+				numRows: 0,
+			},
+		},
+		{
+			name: "IF non-empty nullable nested column data type Array(Array(Map(String, UInt64))) THEN no error happens",
+			args: args{
+				data: [][]interface{}{
+					{
+						nil,
+						[][]map[string]uint64{
+							{
+								map[string]uint64{
+									"tai":  uint64(26072000),
+									"nmba": uint64(25042003),
+								},
+							},
+						},
+					},
+				},
+				colNames: []string{"nullable_nested_array_col"},
+				colTypes: []column.CHColumnType{
+					column.CHColumnType("Nullable(Array(Array(Map(String, UInt64))))"),
+				},
+				numRows: 2,
+			},
+		},
+	}
+
+	for _, tt := range testCases {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			block, err := NewBlock(tt.args.colNames, tt.args.colTypes, tt.args.numRows)
+			assert.NoError(t, err)
+
+			actualRowReads, _, err := block.ReadFromColumnValues(tt.args.data)
+			assert.NoError(t, err)
+			assert.Equal(t, tt.args.numRows, actualRowReads)
+
+			var buf bytes.Buffer
+			encoder := ch_encoding.NewEncoder(&buf)
+			decoder := ch_encoding.NewDecoder(&buf)
+
+			err = WriteBlockToEncoder(encoder, block)
+			assert.NoError(t, err)
+
+			block, err = ReadBlockFromDecoder(decoder)
+			assert.NoError(t, err)
+			assert.Equal(t, tt.args.numRows, block.NumRows)
+		})
+	}
+}

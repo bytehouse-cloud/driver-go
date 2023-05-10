@@ -31,18 +31,24 @@ func (i *UInt16ColumnData) ReadFromValues(values []interface{}) (int, error) {
 	}
 
 	var (
-		v   uint16
-		ok  bool
-		err error
+		err            error
+		readUInt16Func func(value interface{}) (uint16, bool)
 	)
 
-	readUInt16Func, err := interpretUInt16Type(values[0])
-	if err != nil {
-		return 0, err
-	}
-
 	for idx, value := range values {
-		v, ok = readUInt16Func(value)
+		if value == nil {
+			binary.LittleEndian.PutUint16(i.raw[idx*uint16ByteSize:], 0)
+			continue
+		}
+
+		if readUInt16Func == nil {
+			readUInt16Func, err = interpretUInt16Type(value)
+			if err != nil {
+				return 0, err
+			}
+		}
+
+		v, ok := readUInt16Func(value)
 		if !ok {
 			return idx, NewErrInvalidColumnType(value, v)
 		}
@@ -60,7 +66,7 @@ func (u *UInt16ColumnData) ReadFromTexts(texts []string) (int, error) {
 	)
 
 	for i, text := range texts {
-		if text == "" {
+		if isEmptyOrNull(text) {
 			binary.LittleEndian.PutUint16(u.raw[i*uint16ByteSize:], 0)
 			continue
 		}

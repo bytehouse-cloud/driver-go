@@ -78,11 +78,11 @@ func TestArrayColumnData_ReadFromTexts(t *testing.T) {
 			name:       "Should return empty array",
 			columnType: "Array(UInt8)",
 			args: args{
-				texts: []string{""},
+				texts: []string{"", "null"},
 			},
-			wantDataWritten:    []string{"[]"},
+			wantDataWritten:    []string{"[]", "[]"},
 			wantRawDataWritten: [][]interface{}{{}},
-			wantRowsRead:       1,
+			wantRowsRead:       2,
 			wantErr:            false,
 		},
 		{

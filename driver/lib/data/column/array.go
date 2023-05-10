@@ -106,7 +106,7 @@ func (a *ArrayColumnData) ReadFromTexts(texts []string) (int, error) {
 	)
 
 	for i, text := range texts {
-		if text == "" {
+		if isEmptyOrNull(text) {
 			binary.LittleEndian.PutUint64(a.offsetsRaw[i*uint64ByteSize:], offset)
 			continue
 		}

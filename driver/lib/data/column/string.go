@@ -65,6 +65,11 @@ func (s *StringColumnData) WriteToEncoder(encoder *ch_encoding.Encoder) error {
 
 func (s *StringColumnData) ReadFromValues(values []interface{}) (int, error) {
 	for i, value := range values {
+		if value == nil {
+			s.raw[i] = sixb.StoB("")
+			continue
+		}
+
 		v, ok := value.(string)
 		if !ok {
 			return i, NewErrInvalidColumnType(value, v)

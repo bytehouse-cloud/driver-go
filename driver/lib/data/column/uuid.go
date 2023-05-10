@@ -31,10 +31,16 @@ func (u *UUIDColumnData) WriteToEncoder(encoder *ch_encoding.Encoder) error {
 
 func (u *UUIDColumnData) ReadFromValues(values []interface{}) (int, error) {
 	for i, value := range values {
+		if value == nil {
+			copy(u.raw[i*uuidLen:], zeroUUID[:])
+			continue
+		}
+
 		uid, ok := value.(uuid.UUID)
 		if !ok {
 			return i, NewErrInvalidColumnType(value, uid)
 		}
+
 		// convert uuidv1 to uuidv4
 		swapV1V4(uid[:])
 		copy(u.raw[i*uuidLen:], uid[:])
@@ -50,7 +56,7 @@ func (u *UUIDColumnData) ReadFromTexts(texts []string) (int, error) {
 	)
 
 	for i, text := range texts {
-		if text == "" {
+		if isEmptyOrNull(text) {
 			copy(u.raw[i*uuidLen:], zeroUUID[:])
 			continue
 		}

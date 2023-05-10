@@ -6,6 +6,7 @@ import (
 	"log"
 	"runtime/debug"
 	"strings"
+	"time"
 
 	"github.com/google/uuid"
 
@@ -453,6 +454,9 @@ func (g *GatewayConn) ApplyConnConfigs(configs map[string]interface{}) {
 				continue
 			}
 			g.connConfigs.receiveTimeoutSeconds = sec
+			if g.conn != nil && g.conn.refreshReader != nil {
+				g.conn.refreshReader.ForceSetReadTimeout(time.Duration(g.connConfigs.receiveTimeoutSeconds) * time.Second)
+			}
 		}
 	}
 }
@@ -475,6 +479,9 @@ func (g *GatewayConn) ApplyConnConfigsTemporarily(configs map[string]interface{}
 				continue
 			}
 			g.connConfigs.receiveTimeoutSeconds = sec
+			if g.conn != nil && g.conn.refreshReader != nil {
+				g.conn.refreshReader.ForceSetReadTimeout(time.Duration(g.connConfigs.receiveTimeoutSeconds) * time.Second)
+			}
 		}
 	}
 
@@ -513,7 +520,15 @@ func (g *GatewayConn) InAnsiSQLMode() bool {
 	if g.settings == nil {
 		return false
 	}
-	v, ok := g.settings["ansi_sql"]
+	v, ok := g.settings["dialect_type"]
+	if ok {
+		dialect, ok := v.(string)
+		if !ok {
+			return false
+		}
+		return dialect == "ANSI"
+	}
+	v, ok = g.settings["ansi_sql"]
 	if !ok {
 		return false
 	}
