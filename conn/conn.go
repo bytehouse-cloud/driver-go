@@ -302,7 +302,7 @@ func (g *GatewayConn) sendClientDataWithTableName(block *data.Block, tableName s
 		return err
 	}
 
-	//TODO: may be able to simplify without flush
+	// TODO: may be able to simplify without flush
 	if err = g.sendBlock(block); err != nil {
 		return err
 	}
@@ -485,9 +485,9 @@ func (g *GatewayConn) ApplyConnConfigsTemporarily(configs map[string]interface{}
 }
 
 func (g *GatewayConn) AddSetting(key string, value interface{}) error {
-	//if err := g.verifySingleSetting(key, value); err != nil {
+	// if err := g.verifySingleSetting(key, value); err != nil {
 	//	return err
-	//}
+	// }
 	g.settings[key] = value
 	return nil
 }
@@ -576,6 +576,8 @@ func (g *GatewayConn) setByteHouseNonUserQuery() func() {
 		}
 		if haveSkipHistory {
 			g.settings["skip_history"] = skipHistory
+		} else {
+			g.settings["skip_history"] = false
 		}
 	}
 }
