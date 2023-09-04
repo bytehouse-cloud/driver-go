@@ -10,8 +10,8 @@ To connect to the ByteHouse, you need to specify the ByteHouse gateway URL with 
 can visit [ByteHouse China](bytehouse.cn) (for China-mainland) or [Bytehouse Global](bytehouse.cloud) (for
 non-China-mainland) to register account.
 
-For ByteHouse Global/China version, users can create and download credentials from [console](https://console.bytehouse.cloud/account/details)
-For ByteHouse Volcano Cloud Version, users need to create and download credentials from Volcano Cloud's Account Detailed page
+*For ByteHouse Global/China version, users can create and download credentials from [console](https://console.bytehouse.cloud/account/details)
+*For ByteHouse Volcano Cloud Version, users need to create and download credentials from Volcano Cloud's [Account Details page](https://console.volcengine.com/auth/login?redirectURI=%2Fbytehouse%2Fregion%3Abytehouse%2Bcn-beijing%2Faccount%2Fdetails) 
 
 Create the API Key and save it in the local environment. 
 
@@ -31,45 +31,7 @@ if err != nil {
 defer db.Close()
 ```
 
-Replace the Host:Port and API key placeholders in the dsn below as specified in the ByteHouse doc.
-
-
-
-```go
-package main
-
-import (
-	"context"
-	"fmt"
-
-	"github.com/bytehouse-cloud/driver-go/sdk"
-)
-
-func main() {
-    dsn := fmt.Sprintf("tcp://?region=cn-beijing&volcano=true&access_key=%v&secret_key=%v",
-        "<your ak>",
-        "<your sk>",
-    )
-
-    g, err := sdk.Open(context.Background(), dsn)
-    if err != nil{
-        panic(err)
-    }
-
-    if err := g.Ping(); err != nil {
-        panic(err)
-    }
-
-    res, err := g.Query("select 1, 2, 3")
-    for {
-        row, ok := res.NextRow()
-        if !ok {
-            break
-        }
-        fmt.Println(row)
-    }
-}
-```
+Replace the Host:Port and API key placeholders in the dsn below as specified in the [ByteHouse doc](https://docs.bytehouse.cloud/en/bytehouse/docs/supported-regions-and-providers).
 
 ### DDL
 
@@ -77,36 +39,50 @@ All DDL queries should be done with db.ExecContext
 
 ```go
 package main
-
 import (
-	"context"
-	"database/sql"
-	"fmt"
+    "context"
+    "fmt"
+    "github.com/bytehouse-cloud/driver-go/sdk"
 )
-
 func main() {
-	db, err := sql.Open("bytehouse", "tcp://?region=<region>&account=<account>&user=<user>&password=<password>")
+    dsn := fmt.Sprintf("tcp://{HOST}:{PORT}?secure=true&user=bytehouse&password={API_KEY}")
+//If user wishes to specify the database in url
+    dsn := fmt.Sprintf("tcp://{HOST}:{PORT}?secure=true&user=bytehouse&password={API_KEY}&database={DATABASE}")
 
-	if err != nil {
-		fmt.Printf("error = %v", err)
-		return
-	}
-	defer db.Close()
+    ctx := context.Background()
 
-	ctx := context.Background()
+    g, err := sdk.Open(ctx, dsn)
+    if err != nil {
+       panic(err)
+    }
 
-	// Note first return value is sql.Result, which can be discarded since it is not implemented in the driver
-	if _, err = db.ExecContext(ctx,
-		`CREATE TABLE sample_table 
-				(
-					dog UInt8,
-					cat UInt8
-				)
-				ENGINE=MergeTree ORDER BY dog`,
-	); err != nil {
-		fmt.Printf("error = %v", err)
-		return
-	}
+    if err := g.Ping(); err != nil {
+       panic(err)
+    }
+
+    if qs, err := g.QueryContext(ctx, "CREATE DATABASE my_db"); err != nil || qs.Exception() != nil {
+       if err != nil {
+          panic(err)
+       }
+       if qs.Exception() != nil {
+          panic(qs.Exception())
+       }
+    }
+
+    if qs, err := g.QueryContext(ctx,
+       `CREATE TABLE my_db.animal 
+                (
+                    dog Int64,
+                    cat Int64
+                )
+                ENGINE=CnchMergeTree ORDER BY dog`); err != nil || qs.Exception() != nil {
+       if err != nil {
+          panic(err)
+       }
+       if qs.Exception() != nil {
+          panic(qs.Exception())
+       }
+    }
 }
 ```
 
@@ -121,28 +97,31 @@ You can specify the columns to be inserted, if no column is specified, all colum
 
 ```go
 package main
-
 import (
-	"context"
-	"database/sql"
-	"fmt"
-
-	_ "github.com/bytehouse-cloud/driver-go/sql"
+    "context"
+    "fmt"
+    "github.com/bytehouse-cloud/driver-go/sdk"
 )
-
 func main() {
-	db, err := sql.Open("bytehouse", "tcp://?region=<region>&account=<account>&user=<user>&password=<password>")
-	if err != nil {
-		fmt.Printf("error = %v", err)
-		return
-	}
-	defer db.Close()
+    dsn := fmt.Sprintf("tcp://{HOST}:{PORT}?secure=true&user=bytehouse&password={API_KEY}")
+//If user wishes to specify the database in url
+    dsn := fmt.Sprintf("tcp://{HOST}:{PORT}?secure=true&user=bytehouse&password={API_KEY}&database={DATABASE}")
 
-	ctx := context.Background()
-	// Note first return value is sql.Result, which can be discarded since it is not implemented in the driver
-	if _, err := db.ExecContext(ctx, "INSERT INTO sample_table (col1, col2) VALUES", 1, 2); err != nil {
-		fmt.Printf("error = %v", err)
-	}
+    ctx := context.Background()
+
+    g, err := sdk.Open(ctx, dsn)
+    if err != nil {
+       panic(err)
+    }
+
+    if err := g.Ping(); err != nil {
+       panic(err)
+    }
+
+    if err := g.SendInsertQuery(ctx, "INSERT INTO my_db.animal VALUES (1,2), (3,4)"); err != nil {
+       panic(err)
+    }
+
 }
 ```
 
@@ -152,46 +131,46 @@ func main() {
 package main
 
 import (
-	"context"
-	"database/sql"
-	"fmt"
+        "context"
+        "database/sql"
+        "fmt"
 
-	"github.com/bytehouse-cloud/driver-go"
-	"github.com/bytehouse-cloud/driver-go/sdk"
-	sql2 "github.com/bytehouse-cloud/driver-go/sql"
+        "github.com/bytehouse-cloud/driver-go"
+        "github.com/bytehouse-cloud/driver-go/sdk"
+        sql2 "github.com/bytehouse-cloud/driver-go/sql"
 )
 
 func main() {
-	db, err := sql.Open("bytehouse", "tcp://?region=<region>&account=<account>&user=<user>&password=<password>")
-	if err != nil {
-		fmt.Printf("error = %v", err)
-		return
-	}
-	defer db.Close()
+        db, err := sql.Open("bytehouse", "tcp://gateway.aws-ap-southeast-1.bytehouse.cloud:19000?secure=true&user=bytehouse&password=HhPNNvXncU:S82kyc44Il")
+        if err != nil {
+                fmt.Printf("error = %v", err)
+                return
+        }
+        defer db.Close()
 
-	// set the insert block size if needed
-	ctx := bytehouse.NewQueryContext(context.Background())
-	batchSize := 1000
-	if err != ctx.AddByteHouseSetting(bytehouse.InsertBlockSize, batchSize) {
-		panic(err)
-	}
+        // set the insert block size if needed
+        ctx := bytehouse.NewQueryContext(context.Background())
+        batchSize := 1000
+        if err != ctx.AddQuerySetting(bytehouse.InsertBlockSize, batchSize) {
+                panic(err)
+        }
 
-	if err = sql2.RunConn(ctx, db, func(conn sdk.Conn) error {
-		stmt, err := conn.PrepareContext(ctx, "INSERT INTO sample_table VALUES (?, ?)")
-		if err != nil {
-			return err
-		}
+        if err = sql2.RunConn(ctx, db, func(conn sdk.Conn) error {
+                stmt, err := conn.PrepareContext(ctx, "INSERT INTO sample_table VALUES (?, ?)")
+                if err != nil {
+                        return err
+                }
 
-		for i := 0; i < 1e7; i++ {
-			if err := stmt.ExecContext(ctx, 1, 2); err != nil {
-				return err
-			}
-		}
+                for i := 0; i < 1e7; i++ {
+                        if err := stmt.ExecContext(ctx, 1, 2); err != nil {
+                                return err
+                        }
+                }
 
-		return stmt.Close() // Remember to close the stmt! This step is a must for the query to go through!
-	}); err != nil {
-		fmt.Printf("error = %v", err)
-	}
+                return stmt.Close() // Remember to close the stmt! This step is a must for the query to go through!
+        }); err != nil {
+                fmt.Printf("error = %v", err)
+        }
 
 }
 ```
@@ -237,38 +216,39 @@ Following shows how it can be done with csv file format
 package main
 
 import (
-	"context"
-	"database/sql"
-	"fmt"
-	"os"
+    "context"
+    "database/sql"
+    "fmt"
+    "os"
 
-	"github.com/bytehouse-cloud/driver-go/sdk"
-	_ "github.com/bytehouse-cloud/driver-go/sql"
-	driverSql "github.com/bytehouse-cloud/driver-go/sql"
+    "github.com/bytehouse-cloud/driver-go/sdk"
+    _ "github.com/bytehouse-cloud/driver-go/sql"
+    driverSql "github.com/bytehouse-cloud/driver-go/sql"
 )
 
 func main() {
-	db, err := sql.Open("bytehouse", "tcp://?region=<region>&account=<account>&user=<user>&password=<password>")
-	if err != nil {
-		fmt.Printf("error = %v", err)
-		return
-	}
-	defer db.Close()
+    db, err := sql.Open("bytehouse", "tcp://gateway.aws-ap-southeast-1.bytehouse.cloud:19000?secure=true&user=bytehouse&password=HhPNNvXncU:S82kyc44Il")
+    if err != nil {
+        fmt.Printf("error = %v", err)
+        return
+    }
+    defer db.Close()
 
-	ctx := context.Background()
+    ctx := context.Background()
 
-	file, err := os.Open("./testdata/insert.csv") // path to your .csv file
-	if err != nil {
-		fmt.Printf("error = %v", err)
-		return
-	}
-	defer file.Close()
+    file, err := os.Open("./testdata/insert.csv") // path to your .csv file
+    if err != nil {
+        fmt.Printf("error = %v", err)
+        return
+    }
+    defer file.Close()
 
-	if err = driverSql.RunConn(ctx, db, func(conn sdk.Conn) error {
-		return conn.InsertFromReader(ctx, "INSERT INTO sample_table FORMAT CSV", file, nil)
-	}); err != nil {
-		fmt.Printf("error = %v", err)
-	}
+    if err = driverSql.RunConn(ctx, db, func(conn sdk.Conn) error {
+     _,e :=conn.InsertFromReader(ctx, "INSERT INTO sample_table FORMAT CSV", file)
+        return e
+     }); err != nil {
+         fmt.Printf("error = %v", err)
+     }
 }
 ```
 
@@ -289,40 +269,39 @@ Add to query setting map your custom delimiter The setting name is `format_csv_d
 package main
 
 import (
-	"context"
-	"database/sql"
-	"fmt"
-	"os"
+    "context"
+    "database/sql"
+    "fmt"
+    "os"
 
-	"github.com/bytehouse-cloud/driver-go/sdk"
-	_ "github.com/bytehouse-cloud/driver-go/sql"
-	driverSql "github.com/bytehouse-cloud/driver-go/sql"
+    "github.com/bytehouse-cloud/driver-go/sdk"
+    _ "github.com/bytehouse-cloud/driver-go/sql"
+    driverSql "github.com/bytehouse-cloud/driver-go/sql"
 )
 
 func main() {
-	db, err := sql.Open("bytehouse", "tcp://?region=<region>&account=<account>&user=<user>&password=<password>")
-	if err != nil {
-		fmt.Printf("error = %v", err)
-		return
-	}
-	defer db.Close()
+    db, err := sql.Open("bytehouse", "tcp://gateway.aws-ap-southeast-1.bytehouse.cloud:19000?secure=true&user=bytehouse&password=HhPNNvXncU:S82kyc44Il")
+    if err != nil {
+        fmt.Printf("error = %v", err)
+        return
+    }
+    defer db.Close()
 
-	ctx := context.Background()
+    ctx := context.Background()
 
-	file, err := os.Open("./testdata/insert_with_pipes.csv")
-	if err != nil {
-		fmt.Printf("error = %v", err)
-		return
-	}
-	defer file.Close()
+    file, err := os.Open("./testdata/insert_with_pipes.csv")
+    if err != nil {
+        fmt.Printf("error = %v", err)
+        return
+    }
+    defer file.Close()
 
-	if err = driverSql.RunConn(ctx, db, func(conn sdk.Conn) error {
-		return conn.InsertFromReader(ctx, "INSERT INTO sample_table FORMAT CSV", file, map[string]string{
-			"format_csv_delimiter": "|",
-		})
-	}); err != nil {
-		fmt.Printf("error = %v", err)
-	}
+    if err = driverSql.RunConn(ctx, db, func(conn sdk.Conn) error {
+ _,e :=conn.InsertFromReader(ctx, "INSERT INTO sample_table FORMAT CSV", file)
+ return e
+        }); err != nil {
+ fmt.Printf("error = %v", err)
+        }
 }
 ```
 
@@ -336,38 +315,39 @@ is the same as that defined in your table
 package main
 
 import (
-	"context"
-	"database/sql"
-	"fmt"
-	"os"
+        "context"
+        "database/sql"
+        "fmt"
+        "os"
 
-	"github.com/bytehouse-cloud/driver-go/sdk"
-	_ "github.com/bytehouse-cloud/driver-go/sql"
-	driverSql "github.com/bytehouse-cloud/driver-go/sql"
+        "github.com/bytehouse-cloud/driver-go/sdk"
+        _ "github.com/bytehouse-cloud/driver-go/sql"
+        driverSql "github.com/bytehouse-cloud/driver-go/sql"
 )
 
 func main() {
-	db, err := sql.Open("bytehouse", "tcp://?region=<region>&account=<account>&user=<user>&password=<password>")
-	if err != nil {
-		fmt.Printf("error = %v", err)
-		return
-	}
-	defer db.Close()
+        db, err := sql.Open("bytehouse", "tcp://?region=<region>&account=<account>&user=<user>&password=<password>")
+        if err != nil {
+                fmt.Printf("error = %v", err)
+                return
+        }
+        defer db.Close()
 
-	ctx := context.Background()
+        ctx := context.Background()
 
-	file, err := os.Open("./testdata/insert_with_names.csv")
-	if err != nil {
-		fmt.Printf("error = %v", err)
-		return
-	}
-	defer file.Close()
+        file, err := os.Open("./testdata/insert_with_names.csv")
+        if err != nil {
+                fmt.Printf("error = %v", err)
+                return
+        }
+        defer file.Close()
 
-	if err = driverSql.RunConn(ctx, db, func(conn sdk.Conn) error {
-		return conn.InsertFromReader(ctx, "INSERT INTO sample_table FORMAT CSVWithNames", file, map[string]string{})
-	}); err != nil {
-		fmt.Printf("error = %v", err)
-	}
+        if err = driverSql.RunConn(ctx, db, func(conn sdk.Conn) error {
+     _,e :=conn.InsertFromReader(ctx, "INSERT INTO sample_table FORMAT CSV", file)
+     return e
+            }); err != nil {
+     fmt.Printf("error = %v", err)
+            }
 }
 ```
 
@@ -387,38 +367,39 @@ a, b
 package main
 
 import (
-	"context"
-	"database/sql"
-	"fmt"
-	"os"
+    "context"
+    "database/sql"
+    "fmt"
+    "os"
 
-	"github.com/bytehouse-cloud/driver-go/sdk"
-	_ "github.com/bytehouse-cloud/driver-go/sql"
-	driverSql "github.com/bytehouse-cloud/driver-go/sql"
+    "github.com/bytehouse-cloud/driver-go/sdk"
+    _ "github.com/bytehouse-cloud/driver-go/sql"
+    driverSql "github.com/bytehouse-cloud/driver-go/sql"
 )
 
 func main() {
-	db, err := sql.Open("bytehouse", "tcp://?region=<region>&account=<account>&user=<user>&password=<password>")
-	if err != nil {
-		fmt.Printf("error = %v", err)
-		return
-	}
-	defer db.Close()
+    db, err := sql.Open("bytehouse", "tcp://gateway.aws-ap-southeast-1.bytehouse.cloud:19000?secure=true&user=bytehouse&password=HhPNNvXncU:S82kyc44Il")
+    if err != nil {
+        fmt.Printf("error = %v", err)
+        return
+    }
+    defer db.Close()
 
-	ctx := context.Background()
+    ctx := context.Background()
 
-	file, err := os.Open("insert.json")
-	if err != nil {
-		fmt.Printf("error = %v", err)
-		return
-	}
-	defer file.Close()
+    file, err := os.Open("insert.json")
+    if err != nil {
+        fmt.Printf("error = %v", err)
+        return
+    }
+    defer file.Close()
 
-	if err = driverSql.RunConn(ctx, db, func(conn sdk.Conn) error {
-		return conn.InsertFromReader(ctx, "INSERT INTO sample_table FORMAT JSON", file, map[string]string{})
-	}); err != nil {
-		fmt.Printf("error = %v", err)
-	}
+    if err = driverSql.RunConn(ctx, db, func(conn sdk.Conn) error {
+        _,e :=conn.InsertFromReader(ctx, "INSERT INTO sample_table FORMAT JSON", file)
+        return e
+        }); err != nil {
+        fmt.Printf("error = %v", err)
+    }
 }
 ```
 
@@ -582,7 +563,7 @@ func main() {
 		qr, err := conn.QueryContext(ctx, `
 		SELECT * FROM
 		sample_table
-		`, nil)
+		`)
 		if err != nil {
 			return err
 		}
@@ -640,7 +621,7 @@ func main() {
 
 	var reader io.Reader
 	if err = driverSql.RunConn(ctx, db, func(conn sdk.Conn) error {
-		qr, err := conn.QueryContext(ctx, "SELECT * FROM sample_table", nil)
+		qr, err := conn.QueryContext(ctx, "SELECT * FROM sample_table")
 		if err != nil {
 			return err
 		}
@@ -728,7 +709,7 @@ func main() {
 
 	var reader io.Reader
 	if err = driverSql.RunConn(ctx, db, func(conn sdk.Conn) error {
-		qr, err := conn.QueryContext(ctx, "SELECT * FROM sample_table", nil)
+		qr, err := conn.QueryContext(ctx, "SELECT * FROM sample_table")
 		if err != nil {
 			return err
 		}
@@ -808,7 +789,7 @@ func main() {
 		qr, err =
 			conn.QueryContextWithExternalTableReader(
 				ctx, // External table name used "fish" must match that in the ExternalTableReader
-				"SELECT a, b FROM fish", nil, sdk.NewExternalTableReader(
+				"SELECT a, b FROM fish", sdk.NewExternalTableReader(
 					// Table name
 					"fish",
 					// File path
