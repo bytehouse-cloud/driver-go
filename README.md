@@ -14,6 +14,7 @@ Create the API Key and save it in the local environment.
 
 <img width="830" alt="Screenshot 2023-08-31 at 6 01 19 PM" src="https://github.com/rexlionz/driver-go/assets/87936033/d23777f2-1aa9-4e37-a1bd-5580ed80c7d3">
 
+### Test Connectivity
 
 ```go
 db, err := sql.Open("bytehouse", "tcp://{HOST}:{PORT}?secure=true&user=bytehouse&password={API_KEY}")
