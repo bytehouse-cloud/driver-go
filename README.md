@@ -6,10 +6,6 @@
 
 #### 1. Connect with API Key
 
-To connect to the ByteHouse, you need to specify the ByteHouse gateway URL with your account and user information. You
-can visit [ByteHouse China](bytehouse.cn) (for China-mainland) or [Bytehouse Global](bytehouse.cloud) (for
-non-China-mainland) to register account.
-
 *For ByteHouse Global/China version, users can create and download credentials from [console](https://console.bytehouse.cloud/account/details)
 *For ByteHouse Volcano Cloud Version, users need to create and download credentials from Volcano Cloud's [Account Details page](https://console.volcengine.com/auth/login?redirectURI=%2Fbytehouse%2Fregion%3Abytehouse%2Bcn-beijing%2Faccount%2Fdetails) 
 
