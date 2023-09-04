@@ -10,30 +10,30 @@ To connect to the ByteHouse, you need to specify the ByteHouse gateway URL with 
 can visit [ByteHouse China](bytehouse.cn) (for China-mainland) or [Bytehouse Global](bytehouse.cloud) (for
 non-China-mainland) to register account.
 
-The below login parameters is the same as if you were to login using the web console:
-- Account Name 
-- Region
-- User Name
-- Password
-Create the API Key and save it in the local environment. image
+For ByteHouse Global/China version, users can create and download credentials from [console](https://console.bytehouse.cloud/account/details)
+For ByteHouse Volcano Cloud Version, users need to create and download credentials from Volcano Cloud's Account Detailed page
+
+Create the API Key and save it in the local environment. 
 
 <img width="830" alt="Screenshot 2023-08-31 at 6 01 19 PM" src="https://github.com/rexlionz/driver-go/assets/87936033/d23777f2-1aa9-4e37-a1bd-5580ed80c7d3">
 
 
 ```go
+db, err := sql.Open("bytehouse", "tcp://{HOST}:{PORT}?secure=true&user=bytehouse&password={API_KEY}")
 
-db, err := sql.Open("bytehouse", "tcp://?region=<region>&account=<account>&user=<user>&password=<password>")
+//If user wishes to specify the database in url
+db, err := sql.Open("bytehouse", "tcp://{HOST}:{PORT}?secure=true&user=bytehouse&password={API_KEY}&database={DATABASE}")
+
 if err != nil {
     fmt.Printf("error = %v", err)
     return
 }
 defer db.Close()
-
 ```
-#### 2. Connect with Access Key ID/ Secret Access Key (AK/SK)
 
-- For ByteHouse Global/China version, users can create and download credentials from [console](https://console.bytehouse.cloud/account/details)
-- For ByteHouse Volcano Cloud Version, users need to create and download credentials from Volcano Cloud's [Key Management page](https://console.volcengine.com/iam/keymanage/)
+Replace the Host:Port and API key placeholders in the dsn below as specified in the ByteHouse doc.
+
+
 
 ```go
 package main
