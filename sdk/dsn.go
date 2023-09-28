@@ -123,7 +123,7 @@ func makeConnConfigs(host string, urlValues url.Values, logf func(s string, i ..
 		opts = append(opts, conn.OptionLogf(logf))
 	}
 
-	if region := urlValues.Get(param.REGION); region != "" {
+	if region := urlValues.Get(param.REGION); region != "" && isEmpty(host) {
 		host = ""
 		if volcano := urlValues.Get(param.VOLCANO); volcano != "" {
 			isVolc, err := strconv.ParseBool(volcano)
@@ -270,4 +270,8 @@ func parseUint(s string) (uint64, error) {
 		return 0, nil
 	}
 	return strconv.ParseUint(s, 10, 64)
+}
+
+func isEmpty(host string) bool {
+	return host == "" || host == ":"
 }
