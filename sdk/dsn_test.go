@@ -80,7 +80,7 @@ func TestParseDSN(t *testing.T) {
 		{
 			name: "Can accept volcano region and map accordingly",
 			args: args{
-				dsn: "?region=" + conn.RegionBoe + "&volcano=true",
+				dsn: "?region=" + conn.RegionCnBeijing + "&volcano=true",
 			},
 			want: &Config{
 				databaseName:   "",
@@ -88,14 +88,14 @@ func TestParseDSN(t *testing.T) {
 				querySettings:  map[string]interface{}{},
 			},
 			wantOpts: []conn.OptionConfig{
-				conn.OptionHostName("gateway.volc-boe.offline.bytehouse.cn:19000"),
+				conn.OptionHostName("bytehouse-cn-beijing.volces.com:19000"),
 				conn.OptionSecure(true),
 			},
 		},
 		{
 			name: "Can reject volcano region if no volcano flag is given",
 			args: args{
-				dsn: "?region=" + conn.RegionBoe,
+				dsn: "?region=" + conn.RegionCnBeijing,
 			},
 			wantErr: true,
 		},
@@ -182,6 +182,20 @@ func TestParseDSN(t *testing.T) {
 			},
 			wantOpts: []conn.OptionConfig{
 				conn.OptionRegion(conn.RegionCnNorth1),
+			},
+		},
+		{
+			name: "When both region and host port is provided in signature authentication, priority is host > region",
+			args: args{
+				dsn: "tcp://XXX.XXX.XXX.XXX.XX:19000?region=mock_region&volcano=true&access_key=ABC&secret_key=XYZ",
+			},
+			want: &Config{
+				databaseName:   "",
+				authentication: conn.NewSignatureAuthentication("ABC", "XYZ", "mock_region"),
+				querySettings:  map[string]interface{}{},
+			},
+			wantOpts: []conn.OptionConfig{
+				conn.OptionHostName("XXX.XXX.XXX.XXX.XX:19000"),
 			},
 		},
 		{

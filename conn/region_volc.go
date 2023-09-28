@@ -6,12 +6,10 @@ import (
 )
 
 const (
-	RegionBoe       = "BOE"
 	RegionCnBeijing = "CN-BEIJING"
 )
 
 var hostPortByVolcRegion = map[string]string{
-	RegionBoe:       "gateway.volc-boe.offline.bytehouse.cn:19000",
 	RegionCnBeijing: "bytehouse-cn-beijing.volces.com:19000",
 }
 
