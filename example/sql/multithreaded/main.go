@@ -4,13 +4,11 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"log"
-	"time"
-
-	"golang.org/x/sync/errgroup"
-
 	bytehouse "github.com/bytehouse-cloud/driver-go"
 	_ "github.com/bytehouse-cloud/driver-go/sql" //this is required, otherwise "bytehouse" driver will not be registered
+	"golang.org/x/sync/errgroup"
+	"log"
+	"time"
 )
 
 func main() {

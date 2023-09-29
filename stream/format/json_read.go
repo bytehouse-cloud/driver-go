@@ -239,8 +239,7 @@ func (j *JSONBlockStreamFmtReader) readStringUntilQuote(fb *bytepool.FrameBuffer
 // 2. Have meta field e.g. {"meta": [.................], "data": [...]}
 // Either ways it will skip to the first square brace in the data field
 // e.g. {..., "data": [...]}
-//
-//	^ here
+//                    ^ here
 func (j *JSONBlockStreamFmtReader) skipMeta() error {
 	// the second encountered [ denotes the start of data
 	var countRead int

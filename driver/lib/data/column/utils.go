@@ -37,21 +37,20 @@ const (
 // If end is reached, returns empty string and false
 // Note: takes into account square brackets, round bracket, escape character, single quote, back quote and double quote
 // eg.
-//
-//		s := "[a,d,f,f], dfsdfsd,fsdfsdf,sdfd"
-//		iter := parseUntilCommaOrEOF2(s)
-//		for {
-//			s, ok := iter()
-//			if !ok {
-//				break
-//			}
-//			fmt.Println(s)
+// 	s := "[a,d,f,f], dfsdfsd,fsdfsdf,sdfd"
+//	iter := parseUntilCommaOrEOF2(s)
+//	for {
+//		s, ok := iter()
+//		if !ok {
+//			break
 //		}
-//	 // output:
-//	 // [a,d,f,f]
-//	 // dfsdfsd
-//	 // fsdfsdf
-//	 // sdfd
+//		fmt.Println(s)
+//	}
+//  // output:
+//  // [a,d,f,f]
+//  // dfsdfsd
+//  // fsdfsdf
+//  // sdfd
 func commaIterator(s string) func() (string, bool) {
 	var (
 		escaped                                                  bool

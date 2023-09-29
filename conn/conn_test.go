@@ -9,7 +9,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/bytehouse-cloud/driver-go/driver/lib/bytepool/mocks"
-
 	"github.com/bytehouse-cloud/driver-go/driver/lib/ch_encoding"
 	"github.com/bytehouse-cloud/driver-go/driver/lib/data"
 	"github.com/bytehouse-cloud/driver-go/driver/protocol"

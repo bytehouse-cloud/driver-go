@@ -4,10 +4,9 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"log"
-
 	bytehouse "github.com/bytehouse-cloud/driver-go"
 	_ "github.com/bytehouse-cloud/driver-go/sql" //this is required, otherwise "bytehouse" driver will not be registered
+	"log"
 )
 
 func main() {

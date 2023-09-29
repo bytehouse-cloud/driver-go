@@ -21,12 +21,11 @@ func IsInsert(query string) bool {
 // InsertQuery is a insert Query disected
 // e.g.
 // INSERT INTO table VALUES (1); becomes
-//
-//	{
-//	  DataFmt: "VALUES",
-//	  Query: "INSERT INTO table VALUES",
-//	  Values: "(1)"
-//	}
+// {
+//   DataFmt: "VALUES",
+//   Query: "INSERT INTO table VALUES",
+//   Values: "(1)"
+// }
 type InsertQuery struct {
 	DataFmt string
 	Query   string
