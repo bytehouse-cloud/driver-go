@@ -5,6 +5,7 @@ import (
 	"encoding/binary"
 	"testing"
 
+	"github.com/bytehouse-cloud/driver-go/utils/pointer"
 	"github.com/stretchr/testify/require"
 )
 
@@ -26,7 +27,7 @@ func TestZReader_ReadAll(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			buf := bytes.NewBuffer(tt.args.p)
-			z := NewZReader(buf, 100, 1)
+			z := NewZReader(pointer.IoReader(buf), 100, 1)
 			b := make([]byte, len(tt.args.p))
 			require.NoError(t, z.ReadFull(b))
 			require.Equal(t, tt.args.p, b)
@@ -81,7 +82,7 @@ func TestZReader_ReadUvarint(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			buf := bytes.NewBuffer(tt.args.p)
-			z := NewZReader(buf, 100, 1)
+			z := NewZReader(pointer.IoReader(buf), 100, 1)
 			v, err := z.ReadUvarint()
 			require.NoError(t, err)
 			require.Equal(t, tt.expected, v)
@@ -132,7 +133,7 @@ func TestZReader_PrependCurrentBuffer(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			buf := bytes.NewBuffer(tt.initial)
-			z := NewZReader(buf, 100, 1)
+			z := NewZReader(pointer.IoReader(buf), 100, 1)
 
 			toRead := make([]byte, tt.bytesReadInitially)
 			_, err := z.Read(toRead)

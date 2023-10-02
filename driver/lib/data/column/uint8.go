@@ -30,6 +30,11 @@ func (u *UInt8ColumnData) ReadFromValues(values []interface{}) (int, error) {
 	)
 
 	for idx, value := range values {
+		if value == nil {
+			u.raw[idx] = 0
+			continue
+		}
+
 		v, ok = value.(uint8)
 		if !ok {
 			return idx, NewErrInvalidColumnType(value, v)
@@ -48,7 +53,7 @@ func (u *UInt8ColumnData) ReadFromTexts(texts []string) (int, error) {
 	)
 
 	for i, text := range texts {
-		if text == "" {
+		if isEmptyOrNull(text) {
 			u.raw[i] = byte(0)
 			continue
 		}

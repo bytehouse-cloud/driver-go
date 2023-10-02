@@ -36,6 +36,12 @@ func (f *FixedStringColumnData) ReadFromValues(values []interface{}) (int, error
 	)
 
 	for i, value := range values {
+		if value == nil {
+			n = copy(f.raw[i*sLen:], "")
+			diff = sLen - n
+			copy(f.raw[i*sLen+n:], f.mask[:diff])
+			continue
+		}
 		v, ok = value.(string)
 		if !ok {
 			return i, NewErrInvalidColumnType(value, v)

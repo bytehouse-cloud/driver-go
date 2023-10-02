@@ -373,6 +373,7 @@ var Default = map[string]interface{}{
 	"log_id":                       "",
 	"enable_direct_insert":         false,
 	"statement_timeout_in_seconds": uint64(0),
+	"dialect_type":                 "CLICKHOUSE",
 
 	"virtual_warehouse": "",
 

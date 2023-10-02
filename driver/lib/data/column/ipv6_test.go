@@ -67,13 +67,16 @@ func TestIPv6ColumnData_ReadFromTexts(t *testing.T) {
 			name: "Should return values read if has empty string",
 			args: args{
 				texts: []string{
-					"", "2001:db8::68", "192.0.2.10",
+					"", "2001:db8::68", "192.0.2.10", "null",
 				},
 			},
 			wantDataWritten: []net.IP{
-				net.IPv6zero, net.ParseIP("2001:db8::68"), net.ParseIP("192.0.2.10"),
+				net.IPv6zero,
+				net.ParseIP("2001:db8::68"),
+				net.ParseIP("192.0.2.10"),
+				net.IPv6zero,
 			},
-			want:    3,
+			want:    4,
 			wantErr: false,
 		},
 		{
@@ -138,10 +141,10 @@ func TestIPv6ColumnData_ReadFromValues(t *testing.T) {
 			name: "Should return values read if is ipv4-mapped v6",
 			args: args{
 				values: []interface{}{
-					net.ParseIP("::ffff:192.0.2.1"),
+					net.ParseIP("::ffff:192.0.2.1"), nil,
 				},
 			},
-			want:    1,
+			want:    2,
 			wantErr: false,
 		},
 		{
@@ -186,6 +189,9 @@ func TestIPv6ColumnData_ReadFromValues(t *testing.T) {
 			assert.Equal(t, tt.want, got)
 
 			for idx, value := range tt.args.values {
+				if value == nil {
+					value = zeroIPv6String
+				}
 				assert.Equal(t, fmt.Sprint(value), fmt.Sprint(i.GetValue(idx)))
 			}
 		})

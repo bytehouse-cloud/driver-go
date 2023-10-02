@@ -70,6 +70,11 @@ func (d *DateColumnData) ReadFromValues(values []interface{}) (int, error) {
 	)
 
 	for i, value := range values {
+		if value == nil {
+			binary.LittleEndian.PutUint16(d.raw[i*dateLen:], 0)
+			continue
+		}
+
 		t, ok = value.(time.Time)
 		if !ok {
 			return i, NewErrInvalidColumnType(value, t)
@@ -90,7 +95,7 @@ func (d *DateColumnData) ReadFromTexts(texts []string) (int, error) {
 	parseTime := interpretTimeFormat(supportedStringDateFormats, texts, time.UTC)
 
 	for i, text := range texts {
-		if text == "" {
+		if isEmptyOrNull(text) {
 			binary.LittleEndian.PutUint16(d.raw[i*dateLen:], 0)
 			continue
 		}
@@ -116,6 +121,8 @@ func (d *DateColumnData) ReadFromTexts(texts []string) (int, error) {
 func (d *DateColumnData) get(row int) time.Time {
 	daysSinceEpoch := bufferRowToUint16(d.raw, row)
 	secondsSinceEpoch := int64(daysSinceEpoch) * dayHours * hourSeconds
+	// TODO: @Khoi to check why we got this logic below.
+	// secondsSinceEpoch := int64(daysSinceEpoch+uint16(d.dayOffset)) * dayHours * hourSeconds
 	return time.Unix(secondsSinceEpoch, 0)
 }
 
@@ -147,3 +154,11 @@ func (d *DateColumnData) Close() error {
 	bytepool.PutBytes(d.raw)
 	return nil
 }
+
+// todo: should not be doing this
+// func getDecimalFromTime(format string, s string) (time.Time, error) {
+//	if len(s) == 5 && strings.ToUpper(s) == "NOW()" {
+//		return time.Now(), nil
+//	}
+//	return time.Parse(format, s)
+// }

@@ -23,9 +23,9 @@ func ReadCHElemTillStop(w Writer, z *bytepool.ZReader, col column.CHColumnData, 
 	case *column.StringColumnData, *column.FixedStringColumnData:
 		return readString(w, z, stop)
 	case *column.ArrayColumnData:
-		return readArray(w, z)
+		return readArray(w, z, stop)
 	case *column.MapColumnData:
-		return readMap(w, z)
+		return readMap(w, z, stop)
 	case *column.NullableColumnData:
 		return ReadCHElemTillStop(w, z, data.GetInnerColumnData(), stop)
 	default:
@@ -69,11 +69,14 @@ func readString(w Writer, z *bytepool.ZReader, stop byte) error {
 	return nil
 }
 
-func readArray(w Writer, z *bytepool.ZReader) error {
+func readArray(w Writer, z *bytepool.ZReader, stop byte) error {
 	b, err := ReadNextNonSpaceByte(z)
 	if b != squareOpenBrace {
-		z.UnreadCurrentBuffer(1) // if not open square bracket then current value should be empty string ""
-		return err
+		z.UnreadCurrentBuffer(1) // if not open square bracket then current value should be empty string "" or null
+		if err != nil {
+			return err
+		}
+		return readRawTillStop(w, z, stop)
 	}
 
 	w.WriteByte(squareOpenBrace)
@@ -116,11 +119,14 @@ func readArray(w Writer, z *bytepool.ZReader) error {
 	return nil
 }
 
-func readMap(w Writer, z *bytepool.ZReader) error {
+func readMap(w Writer, z *bytepool.ZReader, stop byte) error {
 	b, err := ReadNextNonSpaceByte(z)
 	if b != curlyOpenBrace {
-		z.UnreadCurrentBuffer(1) // if not curly square bracket then current value should be empty string ""
-		return err
+		z.UnreadCurrentBuffer(1) // if not curly square bracket then current value should be empty string "" or null
+		if err != nil {
+			return err
+		}
+		return readRawTillStop(w, z, stop)
 	}
 
 	w.WriteByte(curlyOpenBrace)
@@ -301,7 +307,7 @@ func ReadStringUntilByte(w Writer, z *bytepool.ZReader, b byte) (int, error) {
 }
 
 // Unused function
-//func readNextNonSpaceByteOrNewline(z *bytepool.ZReader) (byte, error) {
+// func readNextNonSpaceByteOrNewline(z *bytepool.ZReader) (byte, error) {
 //	buf, err := z.ReadNextBuffer()
 //	if err != nil {
 //		return 0, err
@@ -316,7 +322,7 @@ func ReadStringUntilByte(w Writer, z *bytepool.ZReader, b byte) (int, error) {
 //
 //	z.UnreadCurrentBuffer(len(buf) - i - 1)
 //	return buf[i], nil
-//}
+// }
 
 func ReadNextNonSpaceByte(z *bytepool.ZReader) (byte, error) {
 	buf, err := z.ReadNextBuffer()

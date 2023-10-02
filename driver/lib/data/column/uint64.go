@@ -33,18 +33,24 @@ func (u *UInt64ColumnData) ReadFromValues(values []interface{}) (int, error) {
 	}
 
 	var (
-		v   uint64
-		ok  bool
-		err error
+		err            error
+		readUInt64Func func(value interface{}) (uint64, bool)
 	)
 
-	readUInt64Func, err := interpretUInt64Type(values[0])
-	if err != nil {
-		return 0, err
-	}
-
 	for idx, value := range values {
-		v, ok = readUInt64Func(value)
+		if value == nil {
+			binary.LittleEndian.PutUint64(u.raw[idx*uint64ByteSize:], 0)
+			continue
+		}
+
+		if readUInt64Func == nil {
+			readUInt64Func, err = interpretUInt64Type(value)
+			if err != nil {
+				return 0, err
+			}
+		}
+
+		v, ok := readUInt64Func(value)
 		if !ok {
 			return idx, NewErrInvalidColumnType(value, v)
 		}
@@ -62,7 +68,7 @@ func (u *UInt64ColumnData) ReadFromTexts(texts []string) (int, error) {
 	)
 
 	for i, text := range texts {
-		if text == "" {
+		if isEmptyOrNull(text) {
 			binary.LittleEndian.PutUint64(u.raw[i*uint64ByteSize:], 0)
 			continue
 		}

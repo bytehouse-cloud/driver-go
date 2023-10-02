@@ -25,10 +25,16 @@ func TestStringColumnData_ReadFromTexts(t *testing.T) {
 		{
 			name: "Should write data and return number of rows read with no error, 1 row",
 			args: args{
-				texts: []string{"1970-01-02 15:04:05jfoiejwofjeowijewofijweofjewfoiejwfoe", "2020-01-02 15:04:05"},
+				texts: []string{"1970-01-02 15:04:05jfoiejwofjeowijewofijweofjewfoiejwfoe",
+					"2020-01-02 15:04:05",
+					"",
+					"null"},
 			},
-			wantRead:     []string{"1970-01-02 15:04:05jfoiejwofjeowijewofijweofjewfoiejwfoe", "2020-01-02 15:04:05"},
-			wantRowsRead: 2,
+			wantRead: []string{"1970-01-02 15:04:05jfoiejwofjeowijewofijweofjewfoiejwfoe",
+				"2020-01-02 15:04:05",
+				"",
+				"null"}, // all are treated as null strings and not the zero string, cannot differentiate 'null' vs null
+			wantRowsRead: 4,
 			wantErr:      false,
 		},
 		{
@@ -68,11 +74,23 @@ func TestStringColumnData_ReadFromValues(t *testing.T) {
 		values []interface{}
 	}
 	tests := []struct {
-		name    string
-		args    args
-		want    int
-		wantErr bool
+		name            string
+		args            args
+		want            int
+		wantErr         bool
+		wantDataWritten []string
 	}{
+		{
+			name: "Should return the same strings",
+			args: args{
+				values: []interface{}{
+					"", nil, "null",
+				},
+			},
+			wantDataWritten: []string{"", "", "null"},
+			want:            3,
+			wantErr:         false,
+		},
 		{
 			name: "Should return the same strings",
 			args: args{
@@ -80,8 +98,9 @@ func TestStringColumnData_ReadFromValues(t *testing.T) {
 					"fewfweewf", "fewfwe",
 				},
 			},
-			want:    2,
-			wantErr: false,
+			wantDataWritten: []string{"fewfweewf", "fewfwe"},
+			want:            2,
+			wantErr:         false,
 		},
 		{
 			name: "Should throw error if one of the values is not string",
@@ -104,6 +123,12 @@ func TestStringColumnData_ReadFromValues(t *testing.T) {
 			}
 			if got != tt.want {
 				t.Errorf("ReadFromValues() got = %v, want %v", got, tt.want)
+			}
+
+			for index, value := range tt.wantDataWritten {
+				if !tt.wantErr {
+					require.Equal(t, value, d.GetValue(index))
+				}
 			}
 		})
 	}

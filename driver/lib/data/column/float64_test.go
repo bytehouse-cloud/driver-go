@@ -33,10 +33,10 @@ func TestFloat64ColumnData_ReadFromTexts(t *testing.T) {
 		{
 			name: "Should write data and return number of rows read with no error, 2 rows",
 			args: args{
-				texts: []string{"", "1.22e+03"},
+				texts: []string{"", "1.22e+03", "null"},
 			},
-			wantDataWritten: []float64{0, 1220},
-			wantRowsRead:    2,
+			wantDataWritten: []float64{0, 1220, 0},
+			wantRowsRead:    3,
 			wantErr:         false,
 		},
 		{
@@ -89,6 +89,14 @@ func TestFloat64ColumnData_ReadFromValues(t *testing.T) {
 		wantRowsRead    int
 		wantErr         bool
 	}{
+		{
+			name: "Should write data and return number of rows read with no error for nil",
+			args: args{
+				values: []interface{}{nil},
+			},
+			wantRowsRead: 1,
+			wantErr:      false,
+		},
 		{
 			name: "Should write data and return number of rows read with no error for float64",
 			args: args{
@@ -144,6 +152,9 @@ func TestFloat64ColumnData_ReadFromValues(t *testing.T) {
 			}
 
 			for index, value := range tt.args.values {
+				if value == nil {
+					value = float64(0)
+				}
 				if !tt.wantErr {
 					assert.Equal(t, fmt.Sprint(value), fmt.Sprint(i.GetValue(index)))
 				}

@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/bytehouse-cloud/driver-go/driver/lib/bytepool"
+	"github.com/bytehouse-cloud/driver-go/utils/pointer"
 )
 
 var tick int32
@@ -90,6 +91,8 @@ func dial(configs *ConnConfig) (*connect, error) {
 					return nil, err
 				}
 			}
+			rReader := NewRefreshReader(conn, time.Duration(configs.receiveTimeoutSeconds)*time.Second)
+
 			// return successful connection
 			return &connect{
 				Conn:           conn,
@@ -97,7 +100,8 @@ func dial(configs *ConnConfig) (*connect, error) {
 				ident:          ident,
 				sendTimeout:    time.Duration(configs.sendTimeoutSeconds) * time.Second,
 				receiveTimeout: time.Duration(configs.receiveTimeoutSeconds) * time.Second,
-				zReader:        bytepool.NewZReaderDefault(NewRefreshReader(conn, time.Duration(configs.receiveTimeoutSeconds)*time.Second)),
+				refreshReader:  rReader, // this is outside the zReader to configure receive_timeout
+				zReader:        bytepool.NewZReaderDefault(pointer.IoReader(rReader)),
 				bWriter:        bufio.NewWriter(conn),
 			}, nil
 		}
@@ -125,6 +129,7 @@ type connect struct {
 	closed         bool
 	receiveTimeout time.Duration
 	sendTimeout    time.Duration
+	refreshReader  *RefreshReader
 	zReader        *bytepool.ZReader
 	bWriter        *bufio.Writer
 }

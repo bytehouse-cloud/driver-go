@@ -108,3 +108,7 @@ func isNull(text string) bool {
 	}
 	return false
 }
+
+func isEmptyOrNull(text string) bool {
+	return text == "" || isNull(text)
+}

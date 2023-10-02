@@ -5,6 +5,7 @@ import (
 	"encoding/binary"
 	"testing"
 
+	"github.com/bytehouse-cloud/driver-go/utils/pointer"
 	"github.com/stretchr/testify/require"
 
 	"github.com/bytehouse-cloud/driver-go/driver/lib/bytepool"
@@ -18,7 +19,7 @@ func TestNewDecoder(t *testing.T) {
 		{
 			name: "Test Read",
 			test: func(t *testing.T) {
-				decoder := NewDecoder(bytepool.NewZReader(bytes.NewReader([]byte("5aabcd")), 100, 100))
+				decoder := NewDecoder(bytepool.NewZReader(pointer.IoReader(bytes.NewReader([]byte("5aabcd"))), 100, 100))
 				require.Equal(t, decoder.IsCompressed(), false)
 
 				readBytes := make([]byte, 4)
@@ -31,7 +32,7 @@ func TestNewDecoder(t *testing.T) {
 		{
 			name: "Test Read UVarint",
 			test: func(t *testing.T) {
-				decoder := NewDecoder(bytepool.NewZReader(bytes.NewReader([]byte("5aabcd")), 100, 100))
+				decoder := NewDecoder(bytepool.NewZReader(pointer.IoReader(bytes.NewReader([]byte("5aabcd"))), 100, 100))
 				require.Equal(t, decoder.IsCompressed(), false)
 
 				n, err := decoder.Uvarint() // Get uvarint ascii code for first char
@@ -44,7 +45,7 @@ func TestNewDecoder(t *testing.T) {
 			test: func(t *testing.T) {
 				b := make([]byte, 8)
 				binary.LittleEndian.PutUint64(b, 10)
-				decoder := NewDecoder(bytepool.NewZReader(bytes.NewReader(b), 100, 100))
+				decoder := NewDecoder(bytepool.NewZReader(pointer.IoReader(bytes.NewReader(b)), 100, 100))
 				require.Equal(t, decoder.IsCompressed(), false)
 
 				n, err := decoder.UInt64()
@@ -57,7 +58,7 @@ func TestNewDecoder(t *testing.T) {
 			test: func(t *testing.T) {
 				b := make([]byte, 8)
 				binary.LittleEndian.PutUint32(b, 10)
-				decoder := NewDecoder(bytepool.NewZReader(bytes.NewReader(b), 100, 100))
+				decoder := NewDecoder(bytepool.NewZReader(pointer.IoReader(bytes.NewReader(b)), 100, 100))
 				require.Equal(t, decoder.IsCompressed(), false)
 
 				n, err := decoder.UInt32()
@@ -70,7 +71,7 @@ func TestNewDecoder(t *testing.T) {
 			test: func(t *testing.T) {
 				b := make([]byte, 8)
 				binary.LittleEndian.PutUint32(b, 10)
-				decoder := NewDecoder(bytepool.NewZReader(bytes.NewReader(b), 100, 100))
+				decoder := NewDecoder(bytepool.NewZReader(pointer.IoReader(bytes.NewReader(b)), 100, 100))
 				require.Equal(t, decoder.IsCompressed(), false)
 
 				n, err := decoder.Int32()
@@ -87,7 +88,7 @@ func TestNewDecoder(t *testing.T) {
 					b[i] = 'h'
 				}
 
-				decoder := NewDecoder(bytepool.NewZReader(bytes.NewReader(b), 100, 100))
+				decoder := NewDecoder(bytepool.NewZReader(pointer.IoReader(bytes.NewReader(b)), 100, 100))
 				require.Equal(t, decoder.IsCompressed(), false)
 
 				str, err := decoder.String()
@@ -101,7 +102,7 @@ func TestNewDecoder(t *testing.T) {
 				b := make([]byte, 1)
 				b[0] = 1
 
-				decoder := NewDecoder(bytepool.NewZReader(bytes.NewReader(b), 100, 100))
+				decoder := NewDecoder(bytepool.NewZReader(pointer.IoReader(bytes.NewReader(b)), 100, 100))
 
 				require.Equal(t, decoder.IsCompressed(), false)
 
@@ -124,7 +125,7 @@ func TestNewDecoderWithCompress(t *testing.T) {
 		{
 			name: "Test can compress",
 			test: func(t *testing.T) {
-				decoder := NewDecoderWithCompress(bytepool.NewZReader(bytes.NewReader([]byte("")), 32, 1))
+				decoder := NewDecoderWithCompress(bytepool.NewZReader(pointer.IoReader(bytes.NewReader([]byte(""))), 32, 1))
 				decoder.SetCompress(true)
 				require.Equal(t, decoder.IsCompressed(), true)
 			},

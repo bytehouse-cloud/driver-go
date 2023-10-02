@@ -3,6 +3,8 @@ package format
 import (
 	"bytes"
 	"context"
+	"fmt"
+	"reflect"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -25,6 +27,42 @@ func TestCSVBlockStreamFmtReader_BlockStreamFmtRead(t *testing.T) {
 			},
 			{
 				Name:           "b",
+				Type:           "Int32",
+				Data:           column.MustMakeColumnData(column.INT32, 0),
+				GenerateColumn: column.MustGenerateColumnDataFactory(column.INT32),
+			},
+		},
+	}
+	singleint32Sample := &data.Block{
+		NumColumns: 1,
+		NumRows:    0,
+		Columns: []*column.CHColumn{
+			{
+				Name:           "a",
+				Type:           "Int32",
+				Data:           column.MustMakeColumnData(column.INT32, 0),
+				GenerateColumn: column.MustGenerateColumnDataFactory(column.INT32),
+			},
+		},
+	}
+	tripleint32Sample := &data.Block{
+		NumColumns: 1,
+		NumRows:    0,
+		Columns: []*column.CHColumn{
+			{
+				Name:           "a",
+				Type:           "Int32",
+				Data:           column.MustMakeColumnData(column.INT32, 0),
+				GenerateColumn: column.MustGenerateColumnDataFactory(column.INT32),
+			},
+			{
+				Name:           "b",
+				Type:           "Int32",
+				Data:           column.MustMakeColumnData(column.INT32, 0),
+				GenerateColumn: column.MustGenerateColumnDataFactory(column.INT32),
+			},
+			{
+				Name:           "c",
 				Type:           "Int32",
 				Data:           column.MustMakeColumnData(column.INT32, 0),
 				GenerateColumn: column.MustGenerateColumnDataFactory(column.INT32),
@@ -60,6 +98,7 @@ func TestCSVBlockStreamFmtReader_BlockStreamFmtRead(t *testing.T) {
 		name              string
 		blockStreamReader BlockStreamFmtReader
 		args              args
+		wantDataRead      [][]string
 		wantBlocksRead    int
 		wantRowsRead      int
 		wantErr           bool
@@ -67,7 +106,9 @@ func TestCSVBlockStreamFmtReader_BlockStreamFmtRead(t *testing.T) {
 		{
 			name: "Can parse block into block stream, with correct block size for each block",
 			blockStreamReader: func() BlockStreamFmtReader {
-				b, _ := BlockStreamFmtReaderFactory(Formats[CSV], bytes.NewReader([]byte("1, 2\n1,2\n1,2")), emptySettings)
+				b, _ := BlockStreamFmtReaderFactory(
+					Formats[CSV], bytes.NewReader([]byte("1, 2\n3,4\n5,6")), emptySettings,
+				)
 				return b
 			}(),
 			args: args{
@@ -75,13 +116,16 @@ func TestCSVBlockStreamFmtReader_BlockStreamFmtRead(t *testing.T) {
 				sample:    int32Sample,
 				blockSize: 3, // Number of rows for each block
 			},
+			wantDataRead:   [][]string{{"1", "2"}, {"3", "4"}, {"5", "6"}},
 			wantBlocksRead: 1,
 			wantRowsRead:   3,
 		},
 		{
 			name: "Can parse block into block stream, with correct block size for each block",
 			blockStreamReader: func() BlockStreamFmtReader {
-				b, _ := BlockStreamFmtReaderFactory(Formats[CSV], bytes.NewReader([]byte("1, 2\n1,2\n1,2")), emptySettings)
+				b, _ := BlockStreamFmtReaderFactory(
+					Formats[CSV], bytes.NewReader([]byte("1, 2\n1,2\n1,2")), emptySettings,
+				)
 				return b
 			}(),
 			args: args{
@@ -89,13 +133,16 @@ func TestCSVBlockStreamFmtReader_BlockStreamFmtRead(t *testing.T) {
 				sample:    int32Sample,
 				blockSize: 1,
 			},
+			wantDataRead:   [][]string{{"1", "2"}, {"1", "2"}, {"1", "2"}},
 			wantBlocksRead: 3,
 			wantRowsRead:   3,
 		},
 		{
 			name: "Can quoted csv into block streams",
 			blockStreamReader: func() BlockStreamFmtReader {
-				b, _ := BlockStreamFmtReaderFactory(Formats[CSV], bytes.NewReader([]byte("'1', '2'\n'1','2'\n'1','2'")), emptySettings)
+				b, _ := BlockStreamFmtReaderFactory(
+					Formats[CSV], bytes.NewReader([]byte("'1', '2'\n'1','2'\n'1','2'")), emptySettings,
+				)
 				return b
 			}(),
 			args: args{
@@ -103,15 +150,18 @@ func TestCSVBlockStreamFmtReader_BlockStreamFmtRead(t *testing.T) {
 				sample:    int32Sample,
 				blockSize: 1,
 			},
+			wantDataRead:   [][]string{{"1", "2"}, {"1", "2"}, {"1", "2"}},
 			wantBlocksRead: 3,
 			wantRowsRead:   3,
 		},
 		{
 			name: "Can quoted csv into block streams with custom delimiter",
 			blockStreamReader: func() BlockStreamFmtReader {
-				b, _ := BlockStreamFmtReaderFactory(Formats[CSV], bytes.NewReader([]byte("'1'| '2'\n'1'|'2'\n'1'|'2'")), map[string]interface{}{
-					csvDelimiterSetting: "|",
-				})
+				b, _ := BlockStreamFmtReaderFactory(
+					Formats[CSV], bytes.NewReader([]byte("'1'| '2'\n'1'|'2'\n'1'|'2'")), map[string]interface{}{
+						csvDelimiterSetting: "|",
+					},
+				)
 				return b
 			}(),
 			args: args{
@@ -119,13 +169,16 @@ func TestCSVBlockStreamFmtReader_BlockStreamFmtRead(t *testing.T) {
 				sample:    int32Sample,
 				blockSize: 1,
 			},
+			wantDataRead:   [][]string{{"1", "2"}, {"1", "2"}, {"1", "2"}},
 			wantBlocksRead: 3,
 			wantRowsRead:   3,
 		},
 		{
 			name: "Can read quoted string csv into block streams",
 			blockStreamReader: func() BlockStreamFmtReader {
-				b, _ := BlockStreamFmtReaderFactory(Formats[CSV], bytes.NewReader([]byte("'1', '2'\n'1','2'\n'1','2'")), emptySettings)
+				b, _ := BlockStreamFmtReaderFactory(
+					Formats[CSV], bytes.NewReader([]byte("'1', '2'\n'1','2'\n'1','2'")), emptySettings,
+				)
 				return b
 			}(),
 			args: args{
@@ -133,13 +186,16 @@ func TestCSVBlockStreamFmtReader_BlockStreamFmtRead(t *testing.T) {
 				sample:    stringSample,
 				blockSize: 1,
 			},
+			wantDataRead:   [][]string{{"1", "2"}, {"1", "2"}, {"1", "2"}},
 			wantBlocksRead: 3,
 			wantRowsRead:   3,
 		},
 		{
 			name: "Can read quoted and non quoted string csv into block streams",
 			blockStreamReader: func() BlockStreamFmtReader {
-				b, _ := BlockStreamFmtReaderFactory(Formats[CSV], bytes.NewReader([]byte("'1', '2'\n'1','2'\n'''1''',2")), emptySettings)
+				b, _ := BlockStreamFmtReaderFactory(
+					Formats[CSV], bytes.NewReader([]byte("'1', '2'\n'1','2'\n'''1''',2")), emptySettings,
+				)
 				return b
 			}(),
 			args: args{
@@ -147,19 +203,26 @@ func TestCSVBlockStreamFmtReader_BlockStreamFmtRead(t *testing.T) {
 				sample:    stringSample,
 				blockSize: 1,
 			},
+			wantDataRead:   [][]string{{"1", "2"}, {"1", "2"}, {"1", "2"}},
 			wantBlocksRead: 3,
 			wantRowsRead:   3,
 		},
 		{
 			name: "Can read quoted string with escaped items csv into block streams",
 			blockStreamReader: func() BlockStreamFmtReader {
-				b, _ := BlockStreamFmtReaderFactory(Formats[CSV], bytes.NewReader([]byte(`"1","2/"\n"2","3\u123\/few"\n"\b\n\r\t\v\a\0",4\"`)), emptySettings)
+				b, _ := BlockStreamFmtReaderFactory(
+					Formats[CSV], bytes.NewReader([]byte(`"1","2/"\n"2","3\u123\/few"\n"\b\n\r\t\v\a\0",4\"`)),
+					emptySettings,
+				)
 				return b
 			}(),
 			args: args{
 				ctx:       c,
 				sample:    stringSample,
 				blockSize: 1,
+			},
+			wantDataRead: [][]string{
+				{"1", "2/"}, {"\\n\"2\"", "3\\u123\\/few"}, {"\\n\"\\b\\n\\r\\t\\v\\a\\0\"", "4\\\""},
 			},
 			wantBlocksRead: 3,
 			wantRowsRead:   3,
@@ -167,7 +230,9 @@ func TestCSVBlockStreamFmtReader_BlockStreamFmtRead(t *testing.T) {
 		{
 			name: "Can read non-quoted string csv into block streams",
 			blockStreamReader: func() BlockStreamFmtReader {
-				b, _ := BlockStreamFmtReaderFactory(Formats[CSV], bytes.NewReader([]byte("1, 2\n1,2\n1,2")), emptySettings)
+				b, _ := BlockStreamFmtReaderFactory(
+					Formats[CSV], bytes.NewReader([]byte("1,2\n1,2\n1,2")), emptySettings,
+				)
 				return b
 			}(),
 			args: args{
@@ -175,13 +240,16 @@ func TestCSVBlockStreamFmtReader_BlockStreamFmtRead(t *testing.T) {
 				sample:    stringSample,
 				blockSize: 1,
 			},
+			wantDataRead:   [][]string{{"1", "2"}, {"1", "2"}, {"1", "2"}},
 			wantBlocksRead: 3,
 			wantRowsRead:   3,
 		},
 		{
 			name: "Can read csv with names",
 			blockStreamReader: func() BlockStreamFmtReader {
-				b, _ := BlockStreamFmtReaderFactory(Formats[CSVWITHNAMES], bytes.NewReader([]byte("jack, ma\n1, 2\n1,2\n1,2")), emptySettings)
+				b, _ := BlockStreamFmtReaderFactory(
+					Formats[CSVWITHNAMES], bytes.NewReader([]byte("jack, ma\n1, 2\n1,2\n1,2")), emptySettings,
+				)
 				return b
 			}(),
 			args: args{
@@ -189,6 +257,7 @@ func TestCSVBlockStreamFmtReader_BlockStreamFmtRead(t *testing.T) {
 				sample:    stringSample,
 				blockSize: 1,
 			},
+			wantDataRead:   [][]string{{"1", "2"}, {"1", "2"}, {"1", "2"}},
 			wantBlocksRead: 3,
 			wantRowsRead:   3,
 		},
@@ -222,6 +291,21 @@ func TestCSVBlockStreamFmtReader_BlockStreamFmtRead(t *testing.T) {
 			wantRowsRead:   1,
 		},
 		{
+			name: "Should not read subsequent blocks if csv format wrong",
+			blockStreamReader: func() BlockStreamFmtReader {
+				b, _ := BlockStreamFmtReaderFactory(Formats[CSV], bytes.NewReader([]byte("1\n2,3")), emptySettings)
+				return b
+			}(),
+			args: args{
+				ctx:       c,
+				sample:    int32Sample,
+				blockSize: 1,
+			},
+			wantErr:        true,
+			wantBlocksRead: 1,
+			wantRowsRead:   1,
+		},
+		{
 			name: "Can handle nullable value in the last column",
 			blockStreamReader: func() BlockStreamFmtReader {
 				b, _ := BlockStreamFmtReaderFactory(Formats[CSV], bytes.NewReader([]byte("1,\n1,2")), emptySettings)
@@ -232,28 +316,307 @@ func TestCSVBlockStreamFmtReader_BlockStreamFmtRead(t *testing.T) {
 				sample:    int32Sample,
 				blockSize: 1, // Number of rows for each block
 			},
+			wantDataRead:   [][]string{{"1", "0"}, {"1", "2"}},
 			wantBlocksRead: 2,
 			wantRowsRead:   2,
+		},
+		{
+			name: "Can handle nullable value in the last column",
+			blockStreamReader: func() BlockStreamFmtReader {
+				b, _ := BlockStreamFmtReaderFactory(Formats[CSV], bytes.NewReader([]byte("1,\n\n\n")), emptySettings)
+				return b
+			}(),
+			args: args{
+				ctx:       c,
+				sample:    int32Sample,
+				blockSize: 1, // Number of rows for each block
+			},
+			wantDataRead:   [][]string{{"1", "0"}},
+			wantBlocksRead: 1,
+			wantRowsRead:   1,
+		},
+		{
+			name: "Can handle nullable value in the non-last column",
+			blockStreamReader: func() BlockStreamFmtReader {
+				b, _ := BlockStreamFmtReaderFactory(
+					Formats[CSV], bytes.NewReader([]byte("1,\n2,\n3,\n,4")), emptySettings,
+				)
+				return b
+			}(),
+			args: args{
+				ctx:       c,
+				sample:    int32Sample,
+				blockSize: 1, // Number of rows for each block
+			},
+			wantDataRead: [][]string{
+				{"1", "0"},
+				{"2", "0"},
+				{"3", "0"},
+				{"0", "4"},
+			},
+			wantBlocksRead: 4,
+			wantRowsRead:   4,
+		},
+		{
+			name: "Can handle nullable value in the last column",
+			blockStreamReader: func() BlockStreamFmtReader {
+				b, _ := BlockStreamFmtReaderFactory(
+					Formats[CSV], bytes.NewReader([]byte("1,")), emptySettings,
+				)
+				return b
+			}(),
+			args: args{
+				ctx:       c,
+				sample:    int32Sample,
+				blockSize: 10000, // Number of rows for each block
+			},
+			wantDataRead: [][]string{
+				{"1", "0"},
+			},
+			wantBlocksRead: 1,
+			wantRowsRead:   1,
+		},
+		{
+			name: "Can handle nullable value in the last column",
+			blockStreamReader: func() BlockStreamFmtReader {
+				b, _ := BlockStreamFmtReaderFactory(
+					Formats[CSV], bytes.NewReader([]byte("1,1\n2,2\n3,3\n4,")), emptySettings,
+				)
+				return b
+			}(),
+			args: args{
+				ctx:       c,
+				sample:    int32Sample,
+				blockSize: 10000, // Number of rows for each block
+			},
+			wantDataRead: [][]string{
+				{"1", "1"},
+				{"2", "2"},
+				{"3", "3"},
+				{"4", "0"},
+			},
+			wantBlocksRead: 1,
+			wantRowsRead:   4,
+		},
+		{
+			name: "Can handle single col single row value",
+			blockStreamReader: func() BlockStreamFmtReader {
+				b, _ := BlockStreamFmtReaderFactory(Formats[CSV], bytes.NewReader([]byte("1")), emptySettings)
+				return b
+			}(),
+			args: args{
+				ctx: c,
+				sample: &data.Block{
+					NumColumns: 1,
+					NumRows:    0,
+					Columns: []*column.CHColumn{
+						{
+							Name:           "a",
+							Type:           "Int32",
+							Data:           column.MustMakeColumnData(column.INT32, 0),
+							GenerateColumn: column.MustGenerateColumnDataFactory(column.INT32),
+						},
+					},
+				},
+				blockSize: 1, // Number of rows for each block
+			},
+			wantDataRead:   [][]string{{"1"}},
+			wantBlocksRead: 1,
+			wantRowsRead:   1,
+		},
+		{
+			name: "Can handle single value",
+			blockStreamReader: func() BlockStreamFmtReader {
+				b, _ := BlockStreamFmtReaderFactory(Formats[CSV], bytes.NewReader([]byte("1\n2\n3\n")), emptySettings)
+				return b
+			}(),
+			args: args{
+				ctx:       c,
+				sample:    singleint32Sample,
+				blockSize: 1, // Number of rows for each block
+			},
+			wantDataRead:   [][]string{{"1"}, {"2"}, {"3"}},
+			wantBlocksRead: 3,
+			wantRowsRead:   3,
+		},
+		{
+			name: "Can handle single value with quote",
+			blockStreamReader: func() BlockStreamFmtReader {
+				b, _ := BlockStreamFmtReaderFactory(
+					Formats[CSV], bytes.NewReader([]byte("'123'\n'234'\n'345'")), emptySettings,
+				)
+				return b
+			}(),
+			args: args{
+				ctx: c,
+				sample: &data.Block{
+					NumColumns: 1,
+					NumRows:    0,
+					Columns: []*column.CHColumn{
+						{
+							Name:           "a",
+							Type:           "String",
+							Data:           column.MustMakeColumnData(column.STRING, 0),
+							GenerateColumn: column.MustGenerateColumnDataFactory(column.STRING),
+						},
+					},
+				},
+				blockSize: 1, // Number of rows for each block
+			},
+			wantDataRead:   [][]string{{"123"}, {"234"}, {"345"}},
+			wantBlocksRead: 3,
+			wantRowsRead:   3,
+		},
+		{
+			name: "Can handle multiple columns value with not-null quote",
+			blockStreamReader: func() BlockStreamFmtReader {
+				b, _ := BlockStreamFmtReaderFactory(
+					Formats[CSV], bytes.NewReader([]byte("'123','234'\n")), emptySettings,
+				)
+				return b
+			}(),
+			args: args{
+				ctx: c,
+				sample: &data.Block{
+					NumColumns: 2,
+					NumRows:    0,
+					Columns: []*column.CHColumn{
+						{
+							Name:           "a",
+							Type:           "String",
+							Data:           column.MustMakeColumnData(column.STRING, 0),
+							GenerateColumn: column.MustGenerateColumnDataFactory(column.STRING),
+						},
+						{
+							Name:           "b",
+							Type:           "String",
+							Data:           column.MustMakeColumnData(column.STRING, 0),
+							GenerateColumn: column.MustGenerateColumnDataFactory(column.STRING),
+						},
+					},
+				},
+				blockSize: 1, // Number of rows for each block
+			},
+			wantDataRead:   [][]string{{"123", "234"}},
+			wantBlocksRead: 1,
+			wantRowsRead:   1,
+		},
+		{
+			name: "Can handle multiple columns value with quote with last column null",
+			blockStreamReader: func() BlockStreamFmtReader {
+				b, _ := BlockStreamFmtReaderFactory(
+					Formats[CSV], bytes.NewReader([]byte("'123','234'\n'345',")), emptySettings,
+				)
+				return b
+			}(),
+			args: args{
+				ctx: c,
+				sample: &data.Block{
+					NumColumns: 2,
+					NumRows:    0,
+					Columns: []*column.CHColumn{
+						{
+							Name:           "a",
+							Type:           "String",
+							Data:           column.MustMakeColumnData(column.STRING, 0),
+							GenerateColumn: column.MustGenerateColumnDataFactory(column.STRING),
+						},
+						{
+							Name:           "b",
+							Type:           "String",
+							Data:           column.MustMakeColumnData(column.STRING, 0),
+							GenerateColumn: column.MustGenerateColumnDataFactory(column.STRING),
+						},
+					},
+				},
+				blockSize: 1000, // Number of rows for each block
+			},
+			wantDataRead:   [][]string{{"123", "234"}, {"345", ""}},
+			wantBlocksRead: 1,
+			wantRowsRead:   2,
+		},
+
+		{
+			name: "Can handle multiple columns value with quote with non-last column null",
+			blockStreamReader: func() BlockStreamFmtReader {
+				b, _ := BlockStreamFmtReaderFactory(
+					Formats[CSV], bytes.NewReader([]byte(",'234'\n,'345'")), emptySettings,
+				)
+				return b
+			}(),
+			args: args{
+				ctx: c,
+				sample: &data.Block{
+					NumColumns: 2,
+					NumRows:    0,
+					Columns: []*column.CHColumn{
+						{
+							Name:           "a",
+							Type:           "String",
+							Data:           column.MustMakeColumnData(column.STRING, 0),
+							GenerateColumn: column.MustGenerateColumnDataFactory(column.STRING),
+						},
+						{
+							Name:           "b",
+							Type:           "String",
+							Data:           column.MustMakeColumnData(column.STRING, 0),
+							GenerateColumn: column.MustGenerateColumnDataFactory(column.STRING),
+						},
+					},
+				},
+				blockSize: 1000, // Number of rows for each block
+			},
+			wantDataRead:   [][]string{{"", "234"}, {"", "345"}},
+			wantBlocksRead: 1,
+			wantRowsRead:   2,
+		},
+		{
+			name: "Return error when triple column and data is incomplete",
+			blockStreamReader: func() BlockStreamFmtReader {
+				b, _ := BlockStreamFmtReaderFactory(Formats[CSV], bytes.NewReader([]byte("1,")), emptySettings)
+				return b
+			}(),
+			args: args{
+				ctx:       c,
+				sample:    tripleint32Sample,
+				blockSize: 1, // Number of rows for each block
+			},
+			wantErr:        true,
+			wantBlocksRead: 3,
+			wantRowsRead:   3,
 		},
 	}
 
 	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			blockStream, yield := tt.blockStreamReader.BlockStreamFmtRead(tt.args.ctx, tt.args.sample, tt.args.blockSize)
-			var nBlocks int
-			for range blockStream {
-				nBlocks++
-			}
-			nRows, err := yield()
-			if tt.wantErr {
-				require.Error(t, err)
-				return
-			}
-
-			require.NoError(t, err)
-			require.Equal(t, tt.wantRowsRead, nRows)
-			require.Equal(t, tt.wantBlocksRead, nBlocks)
-		})
+		t.Run(
+			tt.name, func(t *testing.T) {
+				blockStream, yield := tt.blockStreamReader.BlockStreamFmtRead(
+					tt.args.ctx, tt.args.sample, tt.args.blockSize,
+				)
+				var nBlocks int
+				data := make([][]string, 0)
+				for block := range blockStream {
+					for i := 0; i < block.NumRows; i++ {
+						dataColumn := make([]string, block.NumColumns)
+						block.WriteRowToStrings(dataColumn, i)
+						data = append(data, dataColumn)
+					}
+					nBlocks++
+				}
+				nRows, err := yield()
+				if tt.wantErr {
+					fmt.Println(err)
+					require.Error(t, err)
+					return
+				}
+				fmt.Println("Read actual data:", data)
+				fmt.Println("Want data:", tt.wantDataRead)
+				require.True(t, reflect.DeepEqual(tt.wantDataRead, data))
+				require.NoError(t, err)
+				require.Equal(t, tt.wantRowsRead, nRows)
+				require.Equal(t, tt.wantBlocksRead, nBlocks)
+			},
+		)
 	}
 }
 
@@ -305,24 +668,28 @@ func Test_resolveCSVDelim(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got, err := resolveCSVDelim(tt.givenSettings)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("resolveCSVDelim() error = %v, wantErr %v", err, tt.wantErr)
-				return
-			}
-			if got != tt.want {
-				t.Errorf("resolveCSVDelim() got = %v, want %v", got, tt.want)
-			}
-		})
+		t.Run(
+			tt.name, func(t *testing.T) {
+				got, err := resolveCSVDelim(tt.givenSettings)
+				if (err != nil) != tt.wantErr {
+					t.Errorf("resolveCSVDelim() error = %v, wantErr %v", err, tt.wantErr)
+					return
+				}
+				if got != tt.want {
+					t.Errorf("resolveCSVDelim() got = %v, want %v", got, tt.want)
+				}
+			},
+		)
 	}
 }
 
 func TestCSVBlockStreamFmtReader_ArrayRead(t *testing.T) {
 	arrBlock := makeArrayBlock()
-	input := bytes.NewReader([]byte(`['hello', world], [1, 2, 3]
+	input := bytes.NewReader(
+		[]byte(`['hello', world], [1, 2, 3]
 ["foo", bar], [4,5,6]
-[baz], [7,8,9]`))
+[baz], [7,8,9]`),
+	)
 	r, err := NewCSVBlockStreamFmtReader(input, false, nil)
 	require.NoError(t, err)
 	blockStream, yield := r.BlockStreamFmtRead(context.Background(), arrBlock, 5)
@@ -334,12 +701,14 @@ func TestCSVBlockStreamFmtReader_ArrayRead(t *testing.T) {
 	p.BlockStreamFmtWrite(blockStream)
 	_, err = p.Yield()
 	require.NoError(t, err)
-	require.Equal(t, output.String(), `┌─strArr─────────────┬─intArr────┐
+	require.Equal(
+		t, output.String(), `┌─strArr─────────────┬─intArr────┐
 │ ['hello', 'world'] │ [1, 2, 3] │
 │ ['foo', 'bar']     │ [4, 5, 6] │
 │ ['baz']            │ [7, 8, 9] │
 └────────────────────┴───────────┘
-`)
+`,
+	)
 }
 
 func makeArrayBlock() *data.Block {
@@ -350,14 +719,16 @@ func makeArrayBlock() *data.Block {
 	if err != nil {
 		panic(err)
 	}
-	if _, _, err := block.ReadFromColumnValues([][]interface{}{
-		{
-			[]string{"hello", "world"}, []string{"foo", "bar"}, []string{"baz"},
+	if _, _, err := block.ReadFromColumnValues(
+		[][]interface{}{
+			{
+				[]string{"hello", "world"}, []string{"foo", "bar"}, []string{"baz"},
+			},
+			{
+				[]int32{1, 2, 3}, []int32{4, 5, 6}, []int32{7, 8, 9},
+			},
 		},
-		{
-			[]int32{1, 2, 3}, []int32{4, 5, 6}, []int32{7, 8, 9},
-		},
-	}); err != nil {
+	); err != nil {
 		panic(err)
 	}
 	return block

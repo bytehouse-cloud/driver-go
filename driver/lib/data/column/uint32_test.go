@@ -2,7 +2,6 @@ package column
 
 import (
 	"bytes"
-	"fmt"
 	"math"
 	"strconv"
 	"testing"
@@ -13,27 +12,21 @@ import (
 	"github.com/bytehouse-cloud/driver-go/driver/lib/ch_encoding"
 )
 
-var allUInt32Strings = makeAllUInt32Strings()
+var uint32TestInterfaces, uint32TestValues, uint32TestStrings = createUInt32TestValues()
 
-func makeAllUInt32Strings() []string {
+func createUInt32TestValues() ([]interface{}, []uint32, []string) {
+	var valuesI []interface{}
+	var values []uint32
 	var strs []string
+
 	for i := 0; i <= math.MaxUint32; i += 100000 {
 		str := strconv.Itoa(i)
 		strs = append(strs, str)
-	}
-
-	return strs
-}
-
-var allUInt32Values = makeAllUInt32Values()
-
-func makeAllUInt32Values() []interface{} {
-	var values []interface{}
-	for i := 0; i <= math.MaxUint32; i += 100000 {
 		values = append(values, uint32(i))
+		valuesI = append(valuesI, uint32(i))
 	}
 
-	return values
+	return valuesI, values, strs
 }
 
 func TestUInt32ColumnData_ReadFromTexts(t *testing.T) {
@@ -58,15 +51,15 @@ func TestUInt32ColumnData_ReadFromTexts(t *testing.T) {
 		{
 			name: "Should write data and return number of rows read with no error, all possible uint32",
 			args: args{
-				texts: allUInt32Strings,
+				texts: uint32TestStrings,
 			},
-			wantRowsRead: len(allUInt32Strings),
+			wantRowsRead: len(uint32TestStrings),
 			wantErr:      false,
 		},
 		{
 			name: "Should write zero value if empty string",
 			args: args{
-				texts: []string{"", "1", "", "2"},
+				texts: []string{"", "1", "null", "2"},
 			},
 			wantDataWritten: []uint32{0, 1, 0, 2},
 			wantRowsRead:    4,
@@ -140,28 +133,40 @@ func TestUInt32ColumnData_ReadFromValues(t *testing.T) {
 		wantErr         bool
 	}{
 		{
+			name: "Should write data and return number of rows read with no error for nil",
+			args: args{
+				values: []interface{}{nil},
+			},
+			wantRowsRead:    1,
+			wantDataWritten: []uint32{0},
+			wantErr:         false,
+		},
+		{
 			name: "Should write data and return number of rows read with no error for uint32",
 			args: args{
 				values: []interface{}{uint32(122), uint32(4)},
 			},
-			wantRowsRead: 2,
-			wantErr:      false,
+			wantDataWritten: []uint32{122, 4},
+			wantRowsRead:    2,
+			wantErr:         false,
 		},
 		{
 			name: "Should write data and return number of rows read with no error for uint8",
 			args: args{
 				values: []interface{}{uint8(122), uint8(4)},
 			},
-			wantRowsRead: 2,
-			wantErr:      false,
+			wantDataWritten: []uint32{122, 4},
+			wantRowsRead:    2,
+			wantErr:         false,
 		},
 		{
 			name: "Should write data and return number of rows read with no error for uint16",
 			args: args{
 				values: []interface{}{uint16(122), uint16(4)},
 			},
-			wantRowsRead: 2,
-			wantErr:      false,
+			wantDataWritten: []uint32{122, 4},
+			wantRowsRead:    2,
+			wantErr:         false,
 		},
 		{
 			name: "Should write empty rows",
@@ -174,10 +179,11 @@ func TestUInt32ColumnData_ReadFromValues(t *testing.T) {
 		{
 			name: "Should write data and return number of rows read with no error, all possible uint32",
 			args: args{
-				values: allUInt32Values,
+				values: uint32TestInterfaces,
 			},
-			wantRowsRead: len(allUInt32Values),
-			wantErr:      false,
+			wantDataWritten: uint32TestValues,
+			wantRowsRead:    len(uint32TestInterfaces),
+			wantErr:         false,
 		},
 		{
 			name: "Should throw error with right number of rows read if inconsistent type",
@@ -209,10 +215,9 @@ func TestUInt32ColumnData_ReadFromValues(t *testing.T) {
 				t.Errorf("ReadFromValues() got = %v, wantRowsRead %v", got, tt.wantRowsRead)
 			}
 
-			for index, refValue := range tt.args.values {
+			for index, value := range tt.wantDataWritten {
 				if !tt.wantErr {
-					// Convert int values into string to compare actual value of int instead of the types
-					assert.Equal(t, fmt.Sprint(refValue), fmt.Sprint(i.GetValue(index)))
+					require.Equal(t, value, i.GetValue(index))
 				}
 			}
 		})
@@ -241,9 +246,9 @@ func TestUInt32ColumnData_EncoderDecoder(t *testing.T) {
 		{
 			name: "Should write data and return number of rows read with no error, all possible uint32",
 			args: args{
-				texts: allUInt32Strings,
+				texts: uint32TestStrings,
 			},
-			wantRowsRead: len(allUInt32Strings),
+			wantRowsRead: len(uint32TestStrings),
 			wantErr:      false,
 		},
 		{
