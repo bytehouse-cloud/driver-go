@@ -17,7 +17,7 @@ func TestFixedStringColumnData_ReadFromTexts(t *testing.T) {
 	tests := []struct {
 		name            string
 		args            args
-		wantDataWritten []int8
+		wantDataWritten []string
 		wantRowsRead    int
 		wantErr         bool
 	}{
@@ -26,16 +26,18 @@ func TestFixedStringColumnData_ReadFromTexts(t *testing.T) {
 			args: args{
 				texts: []string{"fefew", "k"},
 			},
-			wantRowsRead: 2,
-			wantErr:      false,
+			wantDataWritten: []string{"fefew", "k"},
+			wantRowsRead:    2,
+			wantErr:         false,
 		},
 		{
 			name: "Should write data and return number of rows read with no error, 2 rows",
 			args: args{
-				texts: []string{"", "fefew", "k"},
+				texts: []string{"", "fefew", "k", "null"},
 			},
-			wantRowsRead: 3,
-			wantErr:      false,
+			wantDataWritten: []string{"", "fefew", "k", "null"}, // all are treated as null strings and not the zero string, cannot differentiate 'null' vs null
+			wantRowsRead:    4,
+			wantErr:         false,
 		},
 		{
 			name: "Should throw err if size larger than fixedstring size",
@@ -59,7 +61,7 @@ func TestFixedStringColumnData_ReadFromTexts(t *testing.T) {
 				t.Errorf("ReadFromTexts() got = %v, wantRowsRead %v", got, tt.wantRowsRead)
 			}
 
-			for index, value := range tt.args.texts {
+			for index, value := range tt.wantDataWritten {
 				if !tt.wantErr {
 					assert.Equal(t, value, i.GetString(index))
 				}
@@ -73,20 +75,22 @@ func TestFixedStringColumnData_ReadFromValues(t *testing.T) {
 		values []interface{}
 	}
 	tests := []struct {
-		name    string
-		args    args
-		want    int
-		wantErr bool
+		name            string
+		args            args
+		want            int
+		wantErr         bool
+		wantDataWritten []string
 	}{
 		{
 			name: "Should return the same strings",
 			args: args{
 				values: []interface{}{
-					"fefew", "k",
+					"fefew", "k", nil,
 				},
 			},
-			want:    2,
-			wantErr: false,
+			want:            3,
+			wantDataWritten: []string{"fefew", "k", ""},
+			wantErr:         false,
 		},
 		{
 			name: "Should throw error if one of the values length too long",
@@ -119,6 +123,12 @@ func TestFixedStringColumnData_ReadFromValues(t *testing.T) {
 			}
 			if got != tt.want {
 				t.Errorf("ReadFromValues() got = %v, want %v", got, tt.want)
+			}
+
+			for index, value := range tt.wantDataWritten {
+				if !tt.wantErr {
+					assert.Equal(t, value, d.GetString(index))
+				}
 			}
 		})
 	}

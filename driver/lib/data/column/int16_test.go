@@ -2,7 +2,6 @@ package column
 
 import (
 	"bytes"
-	"fmt"
 	"math"
 	"strconv"
 	"testing"
@@ -13,27 +12,22 @@ import (
 	"github.com/bytehouse-cloud/driver-go/driver/lib/ch_encoding"
 )
 
-var allInt16Strings = makeAllInt16Strings()
+var int16TestInterfaces, int16TestValues, int16TestStrings = createInt16TestData()
 
-func makeAllInt16Strings() []string {
+func createInt16TestData() ([]interface{}, []int16, []string) {
 	var strs []string
+	var valuesI []interface{}
+	var values []int16
+
 	for i := math.MinInt16; i <= math.MaxInt16; i++ {
 		str := strconv.Itoa(i)
 		strs = append(strs, str)
-	}
 
-	return strs
-}
-
-var allInt16Values = makeAllInt16Values()
-
-func makeAllInt16Values() []interface{} {
-	var values []interface{}
-	for i := math.MinInt16; i <= math.MaxInt16; i++ {
+		valuesI = append(valuesI, int16(i))
 		values = append(values, int16(i))
 	}
 
-	return values
+	return valuesI, values, strs
 }
 
 func TestInt16ColumnData_ReadFromTexts(t *testing.T) {
@@ -58,18 +52,18 @@ func TestInt16ColumnData_ReadFromTexts(t *testing.T) {
 		{
 			name: "Should write data and return number of rows read with no error, all possible int16",
 			args: args{
-				texts: allInt16Strings,
+				texts: int16TestStrings,
 			},
-			wantRowsRead: len(allInt16Strings),
+			wantRowsRead: len(int16TestStrings),
 			wantErr:      false,
 		},
 		{
 			name: "Should write empty string",
 			args: args{
-				texts: []string{"", "122"},
+				texts: []string{"", "122", "null"},
 			},
-			wantDataWritten: []int16{0, 122},
-			wantRowsRead:    2,
+			wantDataWritten: []int16{0, 122, 0},
+			wantRowsRead:    3,
 			wantErr:         false,
 		},
 		{
@@ -142,26 +136,38 @@ func TestInt16ColumnData_ReadFromValues(t *testing.T) {
 		{
 			name: "Should write data and return number of rows read with no error for int16",
 			args: args{
+				values: []interface{}{nil},
+			},
+			wantDataWritten: []int16{0},
+			wantRowsRead:    1,
+			wantErr:         false,
+		},
+		{
+			name: "Should write data and return number of rows read with no error for int16",
+			args: args{
 				values: []interface{}{int16(122), int16(4)},
 			},
-			wantRowsRead: 2,
-			wantErr:      false,
+			wantDataWritten: []int16{122, 4},
+			wantRowsRead:    2,
+			wantErr:         false,
 		},
 		{
 			name: "Should write data and return number of rows read with no error for int8",
 			args: args{
 				values: []interface{}{int8(122), int8(4)},
 			},
-			wantRowsRead: 2,
-			wantErr:      false,
+			wantRowsRead:    2,
+			wantDataWritten: []int16{122, 4},
+			wantErr:         false,
 		},
 		{
 			name: "Should write data and return number of rows read with no error, all possible int16",
 			args: args{
-				values: allInt16Values,
+				values: int16TestInterfaces,
 			},
-			wantRowsRead: len(allInt16Values),
-			wantErr:      false,
+			wantRowsRead:    len(int16TestInterfaces),
+			wantDataWritten: int16TestValues,
+			wantErr:         false,
 		},
 		{
 			name: "Should throw error if inconsistent type",
@@ -193,10 +199,9 @@ func TestInt16ColumnData_ReadFromValues(t *testing.T) {
 				t.Errorf("ReadFromValues() got = %v, wantRowsRead %v", got, tt.wantRowsRead)
 			}
 
-			for index, refValue := range tt.args.values {
+			for index, value := range tt.wantDataWritten {
 				if !tt.wantErr {
-					// Convert int values into string to compare actual value of int instead of the types
-					assert.Equal(t, fmt.Sprint(refValue), fmt.Sprint(i.GetValue(index)))
+					require.Equal(t, value, i.GetValue(index))
 				}
 			}
 		})
@@ -225,9 +230,9 @@ func TestInt16ColumnData_EncoderDecoder(t *testing.T) {
 		{
 			name: "Should write data and return number of rows read with no error, all possible int16",
 			args: args{
-				texts: allInt16Strings,
+				texts: int16TestStrings,
 			},
-			wantRowsRead: len(allInt16Strings),
+			wantRowsRead: len(int16TestStrings),
 			wantErr:      false,
 		},
 		{

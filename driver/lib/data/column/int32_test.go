@@ -2,7 +2,6 @@ package column
 
 import (
 	"bytes"
-	"fmt"
 	"math"
 	"strconv"
 	"testing"
@@ -13,27 +12,22 @@ import (
 	"github.com/bytehouse-cloud/driver-go/driver/lib/ch_encoding"
 )
 
-var allInt32Strings = makeAllInt32Strings()
+var int32TestInterfaces, int32TestValues, int32TestStrings = createInt32TestData()
 
-func makeAllInt32Strings() []string {
+func createInt32TestData() ([]interface{}, []int32, []string) {
+	var valuesI []interface{}
+	var values []int32
 	var strs []string
+
 	for i := math.MinInt32; i <= math.MaxInt32; i += 100000 {
 		str := strconv.Itoa(i)
 		strs = append(strs, str)
-	}
 
-	return strs
-}
-
-var allInt32Values = makeAllInt32Values()
-
-func makeAllInt32Values() []interface{} {
-	var values []interface{}
-	for i := math.MinInt32; i <= math.MaxInt32; i += 100000 {
+		valuesI = append(valuesI, int32(i))
 		values = append(values, int32(i))
 	}
 
-	return values
+	return valuesI, values, strs
 }
 
 func TestInt32ColumnData_ReadFromTexts(t *testing.T) {
@@ -58,18 +52,18 @@ func TestInt32ColumnData_ReadFromTexts(t *testing.T) {
 		{
 			name: "Should write data and return number of rows read with no error, all possible int32",
 			args: args{
-				texts: allInt32Strings,
+				texts: int32TestStrings,
 			},
-			wantRowsRead: len(allInt32Strings),
+			wantRowsRead: len(int32TestStrings),
 			wantErr:      false,
 		},
 		{
 			name: "Should return values for empty string",
 			args: args{
-				texts: []string{"", "122"},
+				texts: []string{"", "122", "null"},
 			},
-			wantDataWritten: []int32{0, 122},
-			wantRowsRead:    2,
+			wantDataWritten: []int32{0, 122, 0},
+			wantRowsRead:    3,
 			wantErr:         false,
 		},
 		{
@@ -142,34 +136,47 @@ func TestInt32ColumnData_ReadFromValues(t *testing.T) {
 		{
 			name: "Should write data and return number of rows read with no error for int32",
 			args: args{
+				values: []interface{}{nil},
+			},
+			wantRowsRead:    1,
+			wantDataWritten: []int32{0},
+			wantErr:         false,
+		},
+		{
+			name: "Should write data and return number of rows read with no error for int32",
+			args: args{
 				values: []interface{}{int32(122), int32(4)},
 			},
-			wantRowsRead: 2,
-			wantErr:      false,
+			wantRowsRead:    2,
+			wantDataWritten: []int32{122, 4},
+			wantErr:         false,
 		},
 		{
 			name: "Should write data and return number of rows read with no error for int8",
 			args: args{
 				values: []interface{}{int8(122), int8(4)},
 			},
-			wantRowsRead: 2,
-			wantErr:      false,
+			wantDataWritten: []int32{122, 4},
+			wantRowsRead:    2,
+			wantErr:         false,
 		},
 		{
 			name: "Should write data and return number of rows read with no error for int16",
 			args: args{
 				values: []interface{}{int16(122), int16(4)},
 			},
-			wantRowsRead: 2,
-			wantErr:      false,
+			wantDataWritten: []int32{122, 4},
+			wantRowsRead:    2,
+			wantErr:         false,
 		},
 		{
 			name: "Should write data and return number of rows read with no error, all possible int32",
 			args: args{
-				values: allInt32Values,
+				values: int32TestInterfaces,
 			},
-			wantRowsRead: len(allInt32Values),
-			wantErr:      false,
+			wantDataWritten: int32TestValues,
+			wantRowsRead:    len(int32TestInterfaces),
+			wantErr:         false,
 		},
 		{
 			name: "Should throw error with right number of rows read if inconsistent type",
@@ -209,10 +216,9 @@ func TestInt32ColumnData_ReadFromValues(t *testing.T) {
 				t.Errorf("ReadFromValues() got = %v, wantRowsRead %v", got, tt.wantRowsRead)
 			}
 
-			for index, refValue := range tt.args.values {
+			for index, value := range tt.wantDataWritten {
 				if !tt.wantErr {
-					// Convert int values into string to compare actual value of int instead of the types
-					assert.Equal(t, fmt.Sprint(refValue), fmt.Sprint(i.GetValue(index)))
+					require.Equal(t, value, i.GetValue(index))
 				}
 			}
 		})
@@ -241,9 +247,9 @@ func TestInt32ColumnData_EncoderDecoder(t *testing.T) {
 		{
 			name: "Should write data and return number of rows read with no error, all possible int32",
 			args: args{
-				texts: allInt32Strings,
+				texts: int32TestStrings,
 			},
-			wantRowsRead: len(allInt32Strings),
+			wantRowsRead: len(int32TestStrings),
 			wantErr:      false,
 		},
 		{

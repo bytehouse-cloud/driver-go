@@ -32,6 +32,10 @@ func (b *BitMapColumnData) ReadFromValues(values []interface{}) (int, error) {
 	valueBuf := new(bytes.Buffer)
 
 	for idx, value := range values {
+		if value == nil {
+			continue
+		}
+
 		row, ok = value.([]uint64)
 		if !ok {
 			return idx, NewErrInvalidColumnType(value, row)
@@ -93,7 +97,7 @@ func (b *BitMapColumnData) ReadFromTexts(texts []string) (int, error) {
 	valueBuf := new(bytes.Buffer)
 
 	for idx, text := range texts {
-		if text == "" {
+		if isEmptyOrNull(text) {
 			continue
 		}
 

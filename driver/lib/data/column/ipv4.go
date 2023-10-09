@@ -29,31 +29,27 @@ func (i *IPv4ColumnData) WriteToEncoder(encoder *ch_encoding.Encoder) error {
 }
 
 func (i *IPv4ColumnData) ReadFromValues(values []interface{}) (int, error) {
-	if len(values) == 0 {
-		return 0, nil
-	}
-
 	var (
 		v  net.IP
 		ok bool
 	)
 
-	// Check first value if is ipv4, if not return
-	v, ok = values[0].(net.IP)
-	if !ok {
-		return 0, NewErrInvalidColumnType(v, values[0])
-	}
-	if v.To4() == nil {
-		return 0, NewErrInvalidColumnTypeCustomText("expected ipv4, current is net.IP but not ipv4")
-	}
-
 	// Assign rest of values
 	for idx, value := range values {
+		if value == nil {
+			copy(i.raw[idx*net.IPv4len:], net.IPv4zero)
+			continue
+		}
+
 		v, ok = value.(net.IP)
 		if !ok {
 			return idx, NewErrInvalidColumnType(value, v)
 		}
-		copy(i.raw[idx*net.IPv4len:], v.To4())
+		v4Address := v.To4()
+		if v4Address == nil {
+			return 0, NewErrInvalidColumnTypeCustomText("expected ipv4, current is net.IP but not ipv4")
+		}
+		copy(i.raw[idx*net.IPv4len:], v4Address)
 	}
 
 	return len(values), nil
@@ -63,7 +59,7 @@ func (i *IPv4ColumnData) ReadFromTexts(texts []string) (int, error) {
 	var ip net.IP
 
 	for idx, text := range texts {
-		if text == "" {
+		if isEmptyOrNull(text) {
 			copy(i.raw[idx*net.IPv4len:], net.IPv4zero)
 			continue
 		}

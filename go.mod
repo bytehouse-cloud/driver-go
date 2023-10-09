@@ -10,6 +10,7 @@ require (
 	github.com/google/uuid v1.3.0
 	github.com/jfcg/sixb v1.3.4
 	github.com/pkg/profile v1.6.0
+	github.com/shopspring/decimal v1.3.1
 	github.com/stretchr/testify v1.8.0
 	github.com/valyala/fastjson v1.6.3
 	go.uber.org/goleak v1.2.1

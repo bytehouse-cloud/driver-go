@@ -79,10 +79,10 @@ func TestBitmapColumnData_ReadFromTexts(t *testing.T) {
 			name:       "Should return empty arrays",
 			columnType: BITMAP64,
 			args: args{
-				texts: []string{"", "[1, 100]", ""},
+				texts: []string{"", "[1, 100]", "", "null"},
 			},
-			wantDataWritten: [][]uint64{{}, {1, 100}, {}},
-			wantRowsRead:    3,
+			wantDataWritten: [][]uint64{{}, {1, 100}, {}, {}},
+			wantRowsRead:    4,
 			wantErr:         false,
 		},
 		{
@@ -158,14 +158,14 @@ func TestBitmapColumnData_ReadFromValues(t *testing.T) {
 			wantErr:         true,
 		},
 		{
-			name:       "Should throw error if nil",
+			name:       "Should return empty if nil",
 			columnType: BITMAP64,
 			args: args{
 				values: []interface{}{nil},
 			},
 			wantDataWritten: [][]uint64{},
-			wantRowsRead:    0,
-			wantErr:         true,
+			wantRowsRead:    1,
+			wantErr:         false,
 		},
 	}
 	for _, tt := range tests {

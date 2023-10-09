@@ -18,7 +18,7 @@ const (
 
 func NewValuesBlockStreamReader(r io.Reader) *ValuesBlockStreamFmtReader {
 	return &ValuesBlockStreamFmtReader{
-		zReader: bytepool.NewZReaderDefault(r),
+		zReader: bytepool.NewZReaderDefault(&r),
 	}
 }
 

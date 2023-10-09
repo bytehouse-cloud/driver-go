@@ -37,21 +37,20 @@ const (
 // If end is reached, returns empty string and false
 // Note: takes into account square brackets, round bracket, escape character, single quote, back quote and double quote
 // eg.
-//
-//		s := "[a,d,f,f], dfsdfsd,fsdfsdf,sdfd"
-//		iter := parseUntilCommaOrEOF2(s)
-//		for {
-//			s, ok := iter()
-//			if !ok {
-//				break
-//			}
-//			fmt.Println(s)
+// 	s := "[a,d,f,f], dfsdfsd,fsdfsdf,sdfd"
+//	iter := parseUntilCommaOrEOF2(s)
+//	for {
+//		s, ok := iter()
+//		if !ok {
+//			break
 //		}
-//	 // output:
-//	 // [a,d,f,f]
-//	 // dfsdfsd
-//	 // fsdfsdf
-//	 // sdfd
+//		fmt.Println(s)
+//	}
+//  // output:
+//  // [a,d,f,f]
+//  // dfsdfsd
+//  // fsdfsdf
+//  // sdfd
 func commaIterator(s string) func() (string, bool) {
 	var (
 		escaped                                                  bool
@@ -285,6 +284,9 @@ func getDateTime64Param(t CHColumnType) (int, *time.Location, error) {
 	if err != nil {
 		return 0, nil, err
 	}
+	if tzString == "" {
+		return precision, nil, nil
+	}
 
 	if tzString == localtime {
 		tzString = local
@@ -294,6 +296,19 @@ func getDateTime64Param(t CHColumnType) (int, *time.Location, error) {
 		return 0, nil, err
 	}
 	return precision, tz, nil
+}
+
+func getTimeParam(t CHColumnType) (int, error) {
+
+	scaleString := string(t[5 : len(t)-1]) //Time(3)
+	if len(scaleString) == 0 {
+		return 0, nil
+	}
+	scale, err := strconv.ParseInt(scaleString, 10, 64)
+	if err != nil {
+		return 0, err
+	}
+	return int(scale), nil
 }
 
 func getColumnValuesUsingOffset(start, end int, columnData CHColumnData) []interface{} {

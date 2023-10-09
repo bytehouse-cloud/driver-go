@@ -10,7 +10,9 @@ type RowReader interface {
 	ReadRowCont(fb *bytepool.FrameBuffer, cols []*column.CHColumn) error
 }
 
-func ReadFirstColumnTexts(fb *bytepool.FrameBuffer, numRows int, cols []*column.CHColumn, rReader RowReader) (int, error) {
+func ReadFirstColumnTexts(fb *bytepool.FrameBuffer, numRows int, cols []*column.CHColumn, rReader RowReader) (
+	int, error,
+) {
 	if numRows == 0 {
 		return 0, nil
 	}
@@ -34,7 +36,9 @@ func ReadFirstColumnTexts(fb *bytepool.FrameBuffer, numRows int, cols []*column.
 	return totalRead, nil
 }
 
-func ReadColumnTextsCont(fb *bytepool.FrameBuffer, numRows int, cols []*column.CHColumn, rReader RowReader) (int, error) {
+func ReadColumnTextsCont(fb *bytepool.FrameBuffer, numRows int, cols []*column.CHColumn, rReader RowReader) (
+	int, error,
+) {
 	var totalRead int
 	for i := 0; i < numRows; i++ {
 		fb.NewRow()

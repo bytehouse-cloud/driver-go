@@ -2,7 +2,6 @@ package column
 
 import (
 	"bytes"
-	"fmt"
 	"strconv"
 	"testing"
 
@@ -13,27 +12,21 @@ import (
 	"github.com/bytehouse-cloud/driver-go/driver/lib/ch_encoding"
 )
 
-var allInt64Strings = makeAllInt64Strings()
+var int64TestInterfaces, int64TestValues, int64TestStrings = createInt64TestData()
 
-func makeAllInt64Strings() []string {
+func createInt64TestData() ([]interface{}, []int64, []string) {
+	var valuesI []interface{}
+	var values []int64
 	var strs []string
+
 	for i := -2147483648; i <= 2147483648*2; i += 100000 {
 		str := strconv.Itoa(i)
 		strs = append(strs, str)
-	}
-
-	return strs
-}
-
-var allInt64Values = makeAllInt64Values()
-
-func makeAllInt64Values() []interface{} {
-	var values []interface{}
-	for i := -2147483648; i <= 2147483648*2; i += 100000 {
 		values = append(values, int64(i))
+		valuesI = append(valuesI, int64(i))
 	}
 
-	return values
+	return valuesI, values, strs
 }
 
 func TestInt64ColumnData_ReadFromTexts(t *testing.T) {
@@ -58,18 +51,18 @@ func TestInt64ColumnData_ReadFromTexts(t *testing.T) {
 		{
 			name: "Should write data and return number of rows read with no error, all possible int64",
 			args: args{
-				texts: allInt64Strings,
+				texts: int64TestStrings,
 			},
-			wantRowsRead: len(allInt64Strings),
+			wantRowsRead: len(int64TestStrings),
 			wantErr:      false,
 		},
 		{
 			name: "Should write empty string as zero value",
 			args: args{
-				texts: []string{"", "122"},
+				texts: []string{"", "122", "null"},
 			},
-			wantDataWritten: []int64{0, 122},
-			wantRowsRead:    2,
+			wantDataWritten: []int64{0, 122, 0},
+			wantRowsRead:    3,
 			wantErr:         false,
 		},
 		{
@@ -140,52 +133,67 @@ func TestInt64ColumnData_ReadFromValues(t *testing.T) {
 			wantErr:      false,
 		},
 		{
+			name: "Should write data and return number of rows read with no error for int64 for nil values",
+			args: args{
+				values: []interface{}{nil},
+			},
+			wantRowsRead:    1,
+			wantDataWritten: []int64{0},
+			wantErr:         false,
+		},
+		{
 			name: "Should write data and return number of rows read with no error for int64",
 			args: args{
 				values: []interface{}{int64(122), int64(4)},
 			},
-			wantRowsRead: 2,
-			wantErr:      false,
+			wantRowsRead:    2,
+			wantDataWritten: []int64{122, 4},
+			wantErr:         false,
 		},
 		{
 			name: "Should write data and return number of rows read with no error for int",
 			args: args{
 				values: []interface{}{int(122), int(4)},
 			},
-			wantRowsRead: 2,
-			wantErr:      false,
+			wantRowsRead:    2,
+			wantDataWritten: []int64{122, 4},
+			wantErr:         false,
 		},
 		{
 			name: "Should write data and return number of rows read with no error for int32",
 			args: args{
 				values: []interface{}{int32(122), int32(4)},
 			},
-			wantRowsRead: 2,
-			wantErr:      false,
+			wantDataWritten: []int64{122, 4},
+			wantRowsRead:    2,
+			wantErr:         false,
 		},
 		{
 			name: "Should write data and return number of rows read with no error for int8",
 			args: args{
 				values: []interface{}{int8(122), int8(4)},
 			},
-			wantRowsRead: 2,
-			wantErr:      false,
+			wantDataWritten: []int64{122, 4},
+			wantRowsRead:    2,
+			wantErr:         false,
 		},
 		{
 			name: "Should write data and return number of rows read with no error for int16",
 			args: args{
 				values: []interface{}{int16(122), int16(4)},
 			},
-			wantRowsRead: 2,
-			wantErr:      false,
+			wantDataWritten: []int64{122, 4},
+			wantRowsRead:    2,
+			wantErr:         false,
 		},
 		{
 			name: "Should write data and return number of rows read with no error, all possible int64",
 			args: args{
-				values: allInt64Values,
+				values: int64TestInterfaces,
 			},
-			wantRowsRead: len(allInt64Values),
-			wantErr:      false,
+			wantDataWritten: int64TestValues,
+			wantRowsRead:    len(int64TestInterfaces),
+			wantErr:         false,
 		},
 		{
 			name: "Should throw error with right number of rows read if inconsistent type",
@@ -217,10 +225,9 @@ func TestInt64ColumnData_ReadFromValues(t *testing.T) {
 				t.Errorf("ReadFromValues() got = %v, wantRowsRead %v", got, tt.wantRowsRead)
 			}
 
-			for index, refValue := range tt.args.values {
+			for index, value := range tt.wantDataWritten {
 				if !tt.wantErr {
-					// Convert int values into string to compare actual value of int instead of the types
-					assert.Equal(t, fmt.Sprint(refValue), fmt.Sprint(i.GetValue(index)))
+					require.Equal(t, value, i.GetValue(index))
 				}
 			}
 		})
@@ -298,19 +305,19 @@ func TestInt64ColumnData_EncoderDecoder(t *testing.T) {
 		{
 			name: "Should write data and return number of rows read with no error, all possible int64",
 			args: args{
-				texts: allInt64Strings,
+				texts: int64TestStrings,
 			},
 			columnType:   INT64,
-			wantRowsRead: len(allInt64Strings),
+			wantRowsRead: len(int64TestStrings),
 			wantErr:      false,
 		},
 		{
 			name: "Should write data and return number of rows read with no error, all possible int64",
 			args: args{
-				texts: allInt64Strings,
+				texts: int64TestStrings,
 			},
 			columnType:   INT,
-			wantRowsRead: len(allInt64Strings),
+			wantRowsRead: len(int64TestStrings),
 			wantErr:      false,
 		},
 		{

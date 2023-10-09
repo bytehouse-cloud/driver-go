@@ -33,10 +33,10 @@ func TestFloat32ColumnData_ReadFromTexts(t *testing.T) {
 		{
 			name: "Should write data and return number of rows read with no error, 2 rows",
 			args: args{
-				texts: []string{"", "1.22e+03"},
+				texts: []string{"", "1.22e+03", "null"},
 			},
-			wantDataWritten: []float32{0, 1220},
-			wantRowsRead:    2,
+			wantDataWritten: []float32{0, 1220, 0},
+			wantRowsRead:    3,
 			wantErr:         false,
 		},
 		{
@@ -92,9 +92,9 @@ func TestFloat32ColumnData_ReadFromValues(t *testing.T) {
 		{
 			name: "Should write data and return number of rows read with no error, 2 rows",
 			args: args{
-				values: []interface{}{float32(122), float32(123)},
+				values: []interface{}{float32(122), float32(123), nil},
 			},
-			wantRowsRead: 2,
+			wantRowsRead: 3,
 			wantErr:      false,
 		},
 		{
@@ -120,6 +120,9 @@ func TestFloat32ColumnData_ReadFromValues(t *testing.T) {
 			}
 
 			for index, value := range tt.args.values {
+				if value == nil {
+					value = float32(0)
+				}
 				if !tt.wantErr && value != i.GetValue(index) {
 					t.Errorf("ReadFromValues(), written data differs")
 				}

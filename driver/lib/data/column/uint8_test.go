@@ -12,26 +12,20 @@ import (
 	"github.com/bytehouse-cloud/driver-go/driver/lib/ch_encoding"
 )
 
-var allUInt8Strings = makeAllUInt8Strings()
-var allUInt8Values = makeAllUInt8Values()
+var uint8TestInterfaces, uint8TestValues, uint8TestStrings = createUInt8TestValues()
 
-func makeAllUInt8Strings() []string {
+func createUInt8TestValues() ([]interface{}, []uint8, []string) {
 	var strs []string
+	var valuesI []interface{}
+	var values []uint8
+
 	for i := 0; i <= math.MaxUint8; i++ {
 		str := strconv.Itoa(i)
 		strs = append(strs, str)
-	}
-
-	return strs
-}
-
-func makeAllUInt8Values() []interface{} {
-	var values []interface{}
-	for i := 0; i <= math.MaxUint8; i++ {
 		values = append(values, uint8(i))
+		valuesI = append(valuesI, uint8(i))
 	}
-
-	return values
+	return valuesI, values, strs
 }
 
 func TestUInt8ColumnData_ReadFromTexts(t *testing.T) {
@@ -56,18 +50,18 @@ func TestUInt8ColumnData_ReadFromTexts(t *testing.T) {
 		{
 			name: "Should write data and return number of rows read with no error, all possible int 8",
 			args: args{
-				texts: allUInt8Strings,
+				texts: uint8TestStrings,
 			},
-			wantRowsRead: len(allUInt8Strings),
+			wantRowsRead: len(uint8TestStrings),
 			wantErr:      false,
 		},
 		{
 			name: "Should write zero value if empty string",
 			args: args{
-				texts: []string{"", "2", "3"},
+				texts: []string{"", "2", "3", "null"},
 			},
-			wantDataWritten: []uint8{0, 2, 3},
-			wantRowsRead:    3,
+			wantDataWritten: []uint8{0, 2, 3, 0},
+			wantRowsRead:    4,
 			wantErr:         false,
 		},
 		{
@@ -138,20 +132,31 @@ func TestUInt8ColumnData_ReadFromValues(t *testing.T) {
 		wantErr         bool
 	}{
 		{
+			name: "Should write data and return number of rows read with no error for nil",
+			args: args{
+				values: []interface{}{nil},
+			},
+			wantRowsRead:    1,
+			wantDataWritten: []uint8{0},
+			wantErr:         false,
+		},
+		{
 			name: "Should write data and return number of rows read with no error, 1 row",
 			args: args{
 				values: []interface{}{uint8(122)},
 			},
-			wantRowsRead: 1,
-			wantErr:      false,
+			wantRowsRead:    1,
+			wantDataWritten: []uint8{122},
+			wantErr:         false,
 		},
 		{
 			name: "Should write data and return number of rows read with no error, all possible uint8",
 			args: args{
-				values: allUInt8Values,
+				values: uint8TestInterfaces,
 			},
-			wantRowsRead: len(allUInt8Values),
-			wantErr:      false,
+			wantDataWritten: uint8TestValues,
+			wantRowsRead:    len(uint8TestValues),
+			wantErr:         false,
 		},
 		{
 			name: "Should throw error if inconsistent type",
@@ -183,9 +188,9 @@ func TestUInt8ColumnData_ReadFromValues(t *testing.T) {
 				t.Errorf("ReadFromValues() got = %v, wantRowsRead %v", got, tt.wantRowsRead)
 			}
 
-			for index, value := range tt.args.values {
-				if !tt.wantErr && value != i.GetValue(index) {
-					t.Errorf("ReadFromValues(), written data differs")
+			for index, value := range tt.wantDataWritten {
+				if !tt.wantErr {
+					require.Equal(t, value, i.GetValue(index))
 				}
 			}
 		})
@@ -214,9 +219,9 @@ func TestUInt8ColumnData_EncoderDecoder(t *testing.T) {
 		{
 			name: "Should write data and return number of rows read with no error, all possible int 8",
 			args: args{
-				texts: allUInt8Strings,
+				texts: uint8TestStrings,
 			},
-			wantRowsRead: len(allUInt8Strings),
+			wantRowsRead: len(uint8TestStrings),
 			wantErr:      false,
 		},
 		{

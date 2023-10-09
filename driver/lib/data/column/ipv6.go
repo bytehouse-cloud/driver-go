@@ -36,6 +36,11 @@ func (i *IPv6ColumnData) ReadFromValues(values []interface{}) (int, error) {
 
 	// Assign rest of values
 	for idx, value := range values {
+		if value == nil {
+			copy(i.raw[idx*net.IPv6len:], net.IPv6zero)
+			continue
+		}
+
 		v, ok = value.(net.IP)
 		if !ok {
 			return idx, NewErrInvalidColumnType(value, v)
@@ -48,7 +53,7 @@ func (i *IPv6ColumnData) ReadFromValues(values []interface{}) (int, error) {
 
 func (i *IPv6ColumnData) ReadFromTexts(texts []string) (int, error) {
 	for idx, text := range texts {
-		if text == "" {
+		if isEmptyOrNull(text) {
 			copy(i.raw[idx*net.IPv6len:], net.IPv6zero)
 			continue
 		}

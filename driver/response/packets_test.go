@@ -5,6 +5,7 @@ import (
 	"encoding/binary"
 	"testing"
 
+	"github.com/bytehouse-cloud/driver-go/utils/pointer"
 	"github.com/stretchr/testify/require"
 
 	"github.com/bytehouse-cloud/driver-go/driver/lib/bytepool"
@@ -23,7 +24,7 @@ func TestReadPacket(t *testing.T) {
 			test: func(t *testing.T) {
 				b := make([]byte, 1000)
 				binary.LittleEndian.PutUint64(b, protocol.ServerHello)
-				decoder := ch_encoding.NewDecoder(bytepool.NewZReader(bytes.NewReader(b), 100, 100))
+				decoder := ch_encoding.NewDecoder(bytepool.NewZReader(pointer.IoReader(bytes.NewReader(b)), 100, 100))
 				p, err := ReadPacket(decoder, false, 0)
 				require.NoError(t, err)
 				require.Equal(t, &HelloPacket{}, p)
@@ -36,7 +37,7 @@ func TestReadPacket(t *testing.T) {
 			test: func(t *testing.T) {
 				b := make([]byte, 1000)
 				binary.LittleEndian.PutUint64(b, protocol.ServerData)
-				decoder := ch_encoding.NewDecoder(bytepool.NewZReader(bytes.NewReader(b), 100, 100))
+				decoder := ch_encoding.NewDecoder(bytepool.NewZReader(pointer.IoReader(bytes.NewReader(b)), 100, 100))
 				p, err := ReadPacket(decoder, false, 0)
 				require.NoError(t, err)
 				require.IsType(t, &DataPacket{}, p)
@@ -48,7 +49,7 @@ func TestReadPacket(t *testing.T) {
 			test: func(t *testing.T) {
 				b := make([]byte, 1000)
 				binary.LittleEndian.PutUint64(b, protocol.ServerException)
-				decoder := ch_encoding.NewDecoder(bytepool.NewZReader(bytes.NewReader(b), 100, 100))
+				decoder := ch_encoding.NewDecoder(bytepool.NewZReader(pointer.IoReader(bytes.NewReader(b)), 100, 100))
 				p, err := ReadPacket(decoder, false, 0)
 				require.NoError(t, err)
 				require.IsType(t, &ExceptionPacket{}, p)
@@ -61,7 +62,7 @@ func TestReadPacket(t *testing.T) {
 			test: func(t *testing.T) {
 				b := make([]byte, 1000)
 				binary.LittleEndian.PutUint64(b, protocol.ServerProgress)
-				decoder := ch_encoding.NewDecoder(bytepool.NewZReader(bytes.NewReader(b), 100, 100))
+				decoder := ch_encoding.NewDecoder(bytepool.NewZReader(pointer.IoReader(bytes.NewReader(b)), 100, 100))
 				p, err := ReadPacket(decoder, false, 0)
 				require.NoError(t, err)
 				require.IsType(t, &ProgressPacket{}, p)
@@ -74,7 +75,7 @@ func TestReadPacket(t *testing.T) {
 			test: func(t *testing.T) {
 				b := make([]byte, 1000)
 				binary.LittleEndian.PutUint64(b, protocol.ServerPong)
-				decoder := ch_encoding.NewDecoder(bytepool.NewZReader(bytes.NewReader(b), 100, 100))
+				decoder := ch_encoding.NewDecoder(bytepool.NewZReader(pointer.IoReader(bytes.NewReader(b)), 100, 100))
 				p, err := ReadPacket(decoder, false, 0)
 				require.NoError(t, err)
 				require.IsType(t, &PongPacket{}, p)
@@ -87,7 +88,7 @@ func TestReadPacket(t *testing.T) {
 			test: func(t *testing.T) {
 				b := make([]byte, 1000)
 				binary.LittleEndian.PutUint64(b, protocol.ServerEndOfStream)
-				decoder := ch_encoding.NewDecoder(bytepool.NewZReader(bytes.NewReader(b), 100, 100))
+				decoder := ch_encoding.NewDecoder(bytepool.NewZReader(pointer.IoReader(bytes.NewReader(b)), 100, 100))
 				p, err := ReadPacket(decoder, false, 0)
 				require.NoError(t, err)
 				require.IsType(t, &EndOfStreamPacket{}, p)
@@ -100,7 +101,7 @@ func TestReadPacket(t *testing.T) {
 			test: func(t *testing.T) {
 				b := make([]byte, 1000)
 				binary.LittleEndian.PutUint64(b, protocol.ServerProfileInfo)
-				decoder := ch_encoding.NewDecoder(bytepool.NewZReader(bytes.NewReader(b), 100, 100))
+				decoder := ch_encoding.NewDecoder(bytepool.NewZReader(pointer.IoReader(bytes.NewReader(b)), 100, 100))
 				p, err := ReadPacket(decoder, false, 0)
 				require.NoError(t, err)
 				require.IsType(t, &ProfilePacket{}, p)
@@ -113,7 +114,7 @@ func TestReadPacket(t *testing.T) {
 			test: func(t *testing.T) {
 				b := make([]byte, 1000)
 				binary.LittleEndian.PutUint64(b, protocol.ServerTotals)
-				decoder := ch_encoding.NewDecoder(bytepool.NewZReader(bytes.NewReader(b), 100, 100))
+				decoder := ch_encoding.NewDecoder(bytepool.NewZReader(pointer.IoReader(bytes.NewReader(b)), 100, 100))
 				p, err := ReadPacket(decoder, false, 0)
 				require.NoError(t, err)
 				require.IsType(t, &TotalsPacket{}, p)
@@ -125,7 +126,7 @@ func TestReadPacket(t *testing.T) {
 			test: func(t *testing.T) {
 				b := make([]byte, 1000)
 				binary.LittleEndian.PutUint64(b, protocol.ServerExtremes)
-				decoder := ch_encoding.NewDecoder(bytepool.NewZReader(bytes.NewReader(b), 100, 100))
+				decoder := ch_encoding.NewDecoder(bytepool.NewZReader(pointer.IoReader(bytes.NewReader(b)), 100, 100))
 				p, err := ReadPacket(decoder, false, 0)
 				require.NoError(t, err)
 				require.IsType(t, &ExtremesPacket{}, p)
@@ -137,7 +138,7 @@ func TestReadPacket(t *testing.T) {
 			test: func(t *testing.T) {
 				b := make([]byte, 1000)
 				binary.LittleEndian.PutUint64(b, protocol.ServerTablesStatus)
-				decoder := ch_encoding.NewDecoder(bytepool.NewZReader(bytes.NewReader(b), 100, 100))
+				decoder := ch_encoding.NewDecoder(bytepool.NewZReader(pointer.IoReader(bytes.NewReader(b)), 100, 100))
 				p, err := ReadPacket(decoder, false, 0)
 				require.Equal(t, err, ErrTableStatusNotSupported)
 				require.IsType(t, &tableStatusPacket{}, p)
@@ -150,7 +151,7 @@ func TestReadPacket(t *testing.T) {
 			test: func(t *testing.T) {
 				b := make([]byte, 1000)
 				binary.LittleEndian.PutUint64(b, protocol.ServerLog)
-				decoder := ch_encoding.NewDecoder(bytepool.NewZReader(bytes.NewReader(b), 100, 100))
+				decoder := ch_encoding.NewDecoder(bytepool.NewZReader(pointer.IoReader(bytes.NewReader(b)), 100, 100))
 				p, err := ReadPacket(decoder, false, 0)
 				require.NoError(t, err)
 				require.IsType(t, &LogPacket{}, p)
@@ -163,7 +164,7 @@ func TestReadPacket(t *testing.T) {
 			test: func(t *testing.T) {
 				b := make([]byte, 1000)
 				binary.LittleEndian.PutUint64(b, protocol.ServerTableColumns)
-				decoder := ch_encoding.NewDecoder(bytepool.NewZReader(bytes.NewReader(b), 100, 100))
+				decoder := ch_encoding.NewDecoder(bytepool.NewZReader(pointer.IoReader(bytes.NewReader(b)), 100, 100))
 				p, err := ReadPacket(decoder, false, 0)
 				require.NoError(t, err)
 				require.IsType(t, &TableColumnsPacket{}, p)
@@ -176,7 +177,7 @@ func TestReadPacket(t *testing.T) {
 			test: func(t *testing.T) {
 				b := make([]byte, 1000)
 				binary.LittleEndian.PutUint64(b, protocol.ServerQueryPlan)
-				decoder := ch_encoding.NewDecoder(bytepool.NewZReader(bytes.NewReader(b), 100, 100))
+				decoder := ch_encoding.NewDecoder(bytepool.NewZReader(pointer.IoReader(bytes.NewReader(b)), 100, 100))
 				p, err := ReadPacket(decoder, false, 0)
 				require.NoError(t, err)
 				require.IsType(t, &QueryPlanPacket{}, p)
@@ -189,7 +190,7 @@ func TestReadPacket(t *testing.T) {
 			test: func(t *testing.T) {
 				b := make([]byte, 1000)
 				binary.LittleEndian.PutUint64(b, protocol.ServerAggQueryPlan)
-				decoder := ch_encoding.NewDecoder(bytepool.NewZReader(bytes.NewReader(b), 100, 100))
+				decoder := ch_encoding.NewDecoder(bytepool.NewZReader(pointer.IoReader(bytes.NewReader(b)), 100, 100))
 				p, err := ReadPacket(decoder, false, 0)
 				require.NoError(t, err)
 				require.IsType(t, &AggregateQueryPlanPacket{}, p)
@@ -202,7 +203,7 @@ func TestReadPacket(t *testing.T) {
 			test: func(t *testing.T) {
 				b := make([]byte, 1000)
 				binary.LittleEndian.PutUint64(b, protocol.ServerQueryMetadata)
-				decoder := ch_encoding.NewDecoder(bytepool.NewZReader(bytes.NewReader(b), 100, 100))
+				decoder := ch_encoding.NewDecoder(bytepool.NewZReader(pointer.IoReader(bytes.NewReader(b)), 100, 100))
 				p, err := ReadPacket(decoder, false, 0)
 				require.NoError(t, err)
 				require.IsType(t, &QueryMetadataPacket{}, p)
@@ -215,7 +216,7 @@ func TestReadPacket(t *testing.T) {
 			test: func(t *testing.T) {
 				b := make([]byte, 1000)
 				binary.LittleEndian.PutUint64(b, 100)
-				decoder := ch_encoding.NewDecoder(bytepool.NewZReader(bytes.NewReader(b), 100, 100))
+				decoder := ch_encoding.NewDecoder(bytepool.NewZReader(pointer.IoReader(bytes.NewReader(b)), 100, 100))
 				p, err := ReadPacket(decoder, false, 0)
 				require.Error(t, err)
 				require.Nil(t, p)

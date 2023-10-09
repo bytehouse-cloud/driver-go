@@ -13,7 +13,7 @@ const (
 )
 
 type ZReader struct {
-	r          io.Reader
+	r          *io.Reader
 	buffer     []byte
 	offset     int
 	forReceive chan []byte
@@ -21,11 +21,11 @@ type ZReader struct {
 	exception  error
 }
 
-func NewZReaderDefault(r io.Reader) *ZReader {
+func NewZReaderDefault(r *io.Reader) *ZReader {
 	return NewZReader(r, defaultBufferSize, defaultChannelSize)
 }
 
-func NewZReader(r io.Reader, bufferSize, channelSize int) *ZReader {
+func NewZReader(r *io.Reader, bufferSize, channelSize int) *ZReader {
 	z := &ZReader{
 		r:          r,
 		buffer:     GetBytes(0, bufferSize),
@@ -44,13 +44,13 @@ func NewZReader(r io.Reader, bufferSize, channelSize int) *ZReader {
 func (z *ZReader) startRead() {
 	defer close(z.forRead)
 
-	if zBuffer, ok := z.r.(*ZBuffer); ok {
+	if zBuffer, ok := (*z.r).(*ZBuffer); ok {
 		z.startReadZBuffer(zBuffer)
 		return
 	}
 
 	for buf := range z.forReceive {
-		n, err := z.r.Read(buf)
+		n, err := (*z.r).Read(buf)
 		if err != nil {
 			if n > 0 {
 				z.forRead <- buf[:n]
@@ -97,7 +97,7 @@ func (z *ZReader) ReadUvarint() (uint64, error) {
 
 // fillBufferIfEmpty attempts to fill the buffer once
 func (z *ZReader) fillBufferIfEmpty() error {
-	if z.bufferBalance() > 0 { //buffer is not empty
+	if z.bufferBalance() > 0 { // buffer is not empty
 		return nil
 	}
 
@@ -175,7 +175,7 @@ func (z *ZReader) shiftDataInBufferRight() {
 func (z *ZReader) Close() error {
 	close(z.forReceive)
 
-	if closer, ok := z.r.(io.Closer); ok {
+	if closer, ok := (*z.r).(io.Closer); ok {
 		return closer.Close()
 	}
 	return nil

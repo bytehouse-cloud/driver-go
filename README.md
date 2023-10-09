@@ -139,7 +139,7 @@ import (
 )
 
 func main() {
-        db, err := sql.Open("bytehouse", "tcp://gateway.aws-ap-southeast-1.bytehouse.cloud:19000?secure=true&user=bytehouse&password=HhPNNvXncU:S82kyc44Il")
+        db, err := sql.Open("bytehouse", "tcp://{HOST}:{PORT}?secure=true&user=bytehouse&password={API_KEY}")
         if err != nil {
                 fmt.Printf("error = %v", err)
                 return
@@ -149,7 +149,7 @@ func main() {
         // set the insert block size if needed
         ctx := bytehouse.NewQueryContext(context.Background())
         batchSize := 1000
-        if err != ctx.AddQuerySetting(bytehouse.InsertBlockSize, batchSize) {
+        if err != ctx.AddClientSetting(bytehouse.InsertBlockSize, batchSize) {
                 panic(err)
         }
 
@@ -189,7 +189,7 @@ import (
 )
 
 func main() {
-	db, err := sql.Open("bytehouse", "tcp://?region=<region>&account=<account>&user=<user>&password=<password>")
+	db, err := sql.Open("bytehouse", "tcp://{HOST}:{PORT}?secure=true&user=bytehouse&password={API_KEY}")
 	if err != nil {
 		fmt.Printf("error = %v", err)
 		return
@@ -225,7 +225,7 @@ import (
 )
 
 func main() {
-    db, err := sql.Open("bytehouse", "tcp://gateway.aws-ap-southeast-1.bytehouse.cloud:19000?secure=true&user=bytehouse&password=HhPNNvXncU:S82kyc44Il")
+    db, err := sql.Open("bytehouse", "tcp://{HOST}:{PORT}?secure=true&user=bytehouse&password={API_KEY}")
     if err != nil {
         fmt.Printf("error = %v", err)
         return
@@ -278,7 +278,7 @@ import (
 )
 
 func main() {
-    db, err := sql.Open("bytehouse", "tcp://gateway.aws-ap-southeast-1.bytehouse.cloud:19000?secure=true&user=bytehouse&password=HhPNNvXncU:S82kyc44Il")
+    db, err := sql.Open("bytehouse", "tcp://{HOST}:{PORT}?secure=true&user=bytehouse&password={API_KEY}")
     if err != nil {
         fmt.Printf("error = %v", err)
         return
@@ -324,7 +324,7 @@ import (
 )
 
 func main() {
-        db, err := sql.Open("bytehouse", "tcp://?region=<region>&account=<account>&user=<user>&password=<password>")
+        db, err := sql.Open("bytehouse", "tcp://{HOST}:{PORT}?secure=true&user=bytehouse&password={API_KEY}")
         if err != nil {
                 fmt.Printf("error = %v", err)
                 return
@@ -376,7 +376,7 @@ import (
 )
 
 func main() {
-    db, err := sql.Open("bytehouse", "tcp://gateway.aws-ap-southeast-1.bytehouse.cloud:19000?secure=true&user=bytehouse&password=HhPNNvXncU:S82kyc44Il")
+    db, err := sql.Open("bytehouse", "tcp://{HOST}:{PORT}?secure=true&user=bytehouse&password={API_KEY}")
     if err != nil {
         fmt.Printf("error = %v", err)
         return
@@ -437,7 +437,7 @@ import (
 )
 
 func main() {
-	db, err := sql.Open("bytehouse", "tcp://?region=<region>&account=<account>&user=<user>&password=<password>")
+	db, err := sql.Open("bytehouse", "tcp://{HOST}:{PORT}?secure=true&user=bytehouse&password={API_KEY}")
 	if err != nil {
 		fmt.Printf("error = %v", err)
 		return
@@ -492,7 +492,7 @@ import (
 )
 
 func main() {
-	db, err := sql.Open("bytehouse", "tcp://?region=<region>&account=<account>&user=<user>&password=<password>")
+	db, err := sql.Open("bytehouse", "tcp://{HOST}:{PORT}?secure=true&user=bytehouse&password={API_KEY}")
 	if err != nil {
 		fmt.Printf("error = %v", err)
 		return
@@ -540,7 +540,7 @@ import (
 )
 
 func main() {
-	db, err := sql.Open("bytehouse", "tcp://?region=<region>&account=<account>&user=<user>&password=<password>")
+	db, err := sql.Open("bytehouse", "tcp://{HOST}:{PORT}?secure=true&user=bytehouse&password={API_KEY}")
 	if err != nil {
 		fmt.Printf("error = %v", err)
 		return
@@ -601,7 +601,7 @@ import (
 )
 
 func main() {
-	db, err := sql.Open("bytehouse", "tcp://?region=<region>&account=<account>&user=<user>&password=<password>")
+	db, err := sql.Open("bytehouse", "tcp://{HOST}:{PORT}?secure=true&user=bytehouse&password={API_KEY}")
 	if err != nil {
 		fmt.Printf("error = %v", err)
 		return
@@ -689,7 +689,7 @@ import (
 )
 
 func main() {
-	db, err := sql.Open("bytehouse", "tcp://?region=<region>&account=<account>&user=<user>&password=<password>")
+	db, err := sql.Open("bytehouse", "tcp://{HOST}:{PORT}?secure=true&user=bytehouse&password={API_KEY}")
 	if err != nil {
 		fmt.Printf("error = %v", err)
 		return
@@ -764,7 +764,7 @@ import (
 )
 
 func main() {
-	db, err := sql.Open("bytehouse", "tcp://?region=<region>&account=<account>&user=<user>&password=<password>")
+	db, err := sql.Open("bytehouse", "tcp://{HOST}:{PORT}?secure=true&user=bytehouse&password={API_KEY}")
 	if err != nil {
 		fmt.Printf("error = %v", err)
 		return
@@ -841,7 +841,7 @@ import (
 )
 
 func main() {
-	db, err := sql.Open("bytehouse", "tcp://?region=<region>&account=<account>&user=<user>&password=<password>")
+	db, err := sql.Open("bytehouse", "tcp://{HOST}:{PORT}?secure=true&user=bytehouse&password={API_KEY}")
 	if err != nil {
 		fmt.Printf("error = %v", err)
 		return

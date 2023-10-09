@@ -126,3 +126,48 @@ func TestParseUnixTimeStampString(t *testing.T) {
 		})
 	}
 }
+
+func TestTimeToDecimalConversionGivenScaleHigherThanValue(t *testing.T) {
+
+	text := "23:59:59.12"
+	scale := 9
+	d, err := parseDecimalTimeFromString(text, scale)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	timeValue := getTimeFromDecimal(d)
+
+	formattedTime := timeValue.Format(GetTimeFormat(scale))
+	assert.Equal(t, "23:59:59.120000000", formattedTime)
+}
+
+func TestTimeToDecimalConversionGivenScaleLowerThanValue(t *testing.T) {
+
+	text := "23:59:59.1234567899"
+	scale := 9
+	d, err := parseDecimalTimeFromString(text, scale)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	timeValue := getTimeFromDecimal(d)
+
+	formattedTime := timeValue.Format(GetTimeFormat(scale))
+	assert.Equal(t, "23:59:59.123456789", formattedTime)
+}
+
+func TestTimeToDecimalConversionGivenScaleEqualToValue(t *testing.T) {
+
+	text := "23:59:59.123456789"
+	scale := 9
+	d, err := parseDecimalTimeFromString(text, scale)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	timeValue := getTimeFromDecimal(d)
+
+	formattedTime := timeValue.Format(GetTimeFormat(scale))
+	assert.Equal(t, "23:59:59.123456789", formattedTime)
+}

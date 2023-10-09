@@ -56,10 +56,10 @@ func TestMapColumnData_ReadFromTexts(t *testing.T) {
 			name:       "Should write empty string with no error",
 			columnType: "Map(UInt64, UInt64)",
 			args: args{
-				texts: []string{"", "{1 : 3 }"},
+				texts: []string{"", "{1 : 3 }", "null"},
 			},
-			wantDataWritten: []string{"{}", "{1: 3}"},
-			wantRowsRead:    2,
+			wantDataWritten: []string{"{}", "{1: 3}", "{}"},
+			wantRowsRead:    3,
 			wantErr:         false,
 		},
 		{
@@ -594,10 +594,10 @@ func TestMapColumnData_EncoderDecoder(t *testing.T) {
 			name:       "Should write empty string with no error",
 			columnType: "Map(UInt64, UInt64)",
 			args: args{
-				texts: []string{"", "{1 : 3 }"},
+				texts: []string{"", "{1 : 3 }", "null"},
 			},
-			wantDataWritten: []string{"{}", "{1: 3}"},
-			wantRowsRead:    2,
+			wantDataWritten: []string{"{}", "{1: 3}", "{}"},
+			wantRowsRead:    3,
 			wantErr:         false,
 		},
 		{
