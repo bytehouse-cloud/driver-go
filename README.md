@@ -37,51 +37,54 @@ All DDL queries should be done with db.ExecContext
 
 ```go
 package main
+
 import (
-    "context"
-    "fmt"
-    "github.com/bytehouse-cloud/driver-go/sdk"
+	"context"
+	"database/sql"
+	"fmt"
+	"log"
+
+	_ "github.com/bytehouse-cloud/driver-go/sql"
 )
+
 func main() {
-    dsn := fmt.Sprintf("tcp://{HOST}:{PORT}?secure=true&user=bytehouse&password={API_KEY}")
-//If user wishes to specify the database in url
-    dsn := fmt.Sprintf("tcp://{HOST}:{PORT}?secure=true&user=bytehouse&password={API_KEY}&database={DATABASE}")
+	dsn := fmt.Sprintf("tcp://{HOST}:{PORT}?secure=true&user=bytehouse&password={API_KEY}")
+	//If user wishes to specify the database in url 
+	dsn := fmt.Sprintf("tcp://{HOST}:{PORT}?secure=true&user=bytehouse&password={API_KEY}&database={DATABASE}")
 
-    ctx := context.Background()
+	db, err := sql.Open("bytehouse", dsn)
+	if err != nil {
+		fmt.Println("failed to open db", err)
+		return
+	}
 
-    g, err := sdk.Open(ctx, dsn)
-    if err != nil {
-       panic(err)
-    }
+	defer db.Close()
 
-    if err := g.Ping(); err != nil {
-       panic(err)
-    }
-
-    if qs, err := g.QueryContext(ctx, "CREATE DATABASE my_db"); err != nil || qs.Exception() != nil {
-       if err != nil {
-          panic(err)
-       }
-       if qs.Exception() != nil {
-          panic(qs.Exception())
-       }
-    }
-
-    if qs, err := g.QueryContext(ctx,
-       `CREATE TABLE my_db.animal 
-                (
-                    dog Int64,
-                    cat Int64
-                )
-                ENGINE=CnchMergeTree ORDER BY dog`); err != nil || qs.Exception() != nil {
-       if err != nil {
-          panic(err)
-       }
-       if qs.Exception() != nil {
-          panic(qs.Exception())
-       }
-    }
-}
+	ctx := context.Background()
+	// create database query
+	createDBQuery := `
+       CREATE database if not exists my_db`
+	_, err = db.ExecContext(ctx, createDBQuery)
+	if err != nil {
+		log.Fatal("failed to execute create database query\n", err)
+		return
+	}
+	
+	// create table query
+	createTableQuery := `
+       CREATE TABLE IF NOT EXISTS my_db.animal
+                  (
+                      dog Int64,
+                      cat Int64
+                  )
+                  ENGINE=CnchMergeTree ORDER BY dog
+    `
+	_, err = db.ExecContext(ctx, createTableQuery)
+	if err != nil {
+		log.Fatal("failed to execute create table query\n", err)
+		return
+	}
+} 
 ```
 
 ### Data Insertion
@@ -91,39 +94,7 @@ You can specify the columns to be inserted, if no column is specified, all colum
 - with select columns `INSERT INTO sample_table (col1, col2) VALUES`
 - without selected columns `INSERT INTO sample_table VALUES`
 
-#### Single Row
-
-```go
-package main
-import (
-    "context"
-    "fmt"
-    "github.com/bytehouse-cloud/driver-go/sdk"
-)
-func main() {
-    dsn := fmt.Sprintf("tcp://{HOST}:{PORT}?secure=true&user=bytehouse&password={API_KEY}")
-//If user wishes to specify the database in url
-    dsn := fmt.Sprintf("tcp://{HOST}:{PORT}?secure=true&user=bytehouse&password={API_KEY}&database={DATABASE}")
-
-    ctx := context.Background()
-
-    g, err := sdk.Open(ctx, dsn)
-    if err != nil {
-       panic(err)
-    }
-
-    if err := g.Ping(); err != nil {
-       panic(err)
-    }
-
-    if err := g.SendInsertQuery(ctx, "INSERT INTO my_db.animal VALUES (1,2), (3,4)"); err != nil {
-       panic(err)
-    }
-
-}
-```
-
-#### Batch insertion
+#### Insertion
 
 ```go
 package main
@@ -158,8 +129,8 @@ func main() {
                 if err != nil {
                         return err
                 }
-
-                for i := 0; i < 1e7; i++ {
+                rows := 1000000
+                for i := 0; i < rows; i++ {
                         if err := stmt.ExecContext(ctx, 1, 2); err != nil {
                                 return err
                         }
