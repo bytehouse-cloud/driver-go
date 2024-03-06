@@ -98,10 +98,13 @@ func waitReady(responses <-chan response.Packet, qr *QueryResult) {
 			if len(b.Columns) == 0 {
 				continue
 			}
+			// When send "insert into ... select ... settings enable_optimizer = 1" sql, waitReady will return early.
+			// So update conditional judgment to make it block
 			qr.columns = b.Columns
-			if b.NumRows > 0 {
-				qr.dataStream <- resp
+			if b.NumRows == 0 {
+				continue
 			}
+			qr.dataStream <- resp
 			return
 		case *response.ExceptionPacket:
 			qr.err = resp
