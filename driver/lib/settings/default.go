@@ -380,4 +380,10 @@ var Default = map[string]interface{}{
 	// CNCH Compatibility with vanilla Clickhouse
 	"force_query_to_shard":        false,
 	"insert_select_with_profiles": false,
+
+	// TOS specific settings
+	"tos_access_key": "",
+	"tos_secret_key": "",
+	"tos_region":     "",
+	"tos_endpoint":   "",
 }
